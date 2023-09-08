@@ -24,8 +24,10 @@ vignette: >
 Install packages (turned off automatic evaluation so it doesn't try to intall them every time)
 
 ```{r, eval = FALSE}
+install.packages("magrittr")
 install.packages("stringr")
 install.packages("rgbif")
+install.packages("pbapply")
 ```
 
 Load packages
@@ -71,7 +73,7 @@ scs_unq <-
     
     split_cases <-
       sapply(row[which_multi], stringr::str_split, "/")
-   
+    
     out <-
       do.call(expand.grid, split_cases) %>% 
       data.frame(row[!which_multi] )
@@ -111,11 +113,126 @@ dim(scs_unq)
 
 Look up species names in GBIF taxonomy (this may take a while)
 
-```{r}
+```{r, eval = FALSE}
 gbif_lookup <- 
-  lapply(unique(scs_unq$Species)[1:10], 
+  lapply(unique(scs_unq$Species), 
          rgbif::name_lookup, 
          verbose = FALSE)
 
 saveRDS(gbif_lookup, "gbif_lookup.rds")
+```
+
+See which names found no match on GBIF
+
+```{r, eval = FALSE}
+gbif_lookup <- readRDS("gbif_lookup.rds")
+
+name_match <- 
+  sapply(1:length(unique(scs_unq$Species)), 
+         function(i){
+           
+           unique(scs_unq$Species)[i] %in%
+             c(gbif_lookup[[i]]$data$species, 
+               gbif_lookup[[i]]$data$scientificName)
+           
+         })
+
+unique(scs_unq$Species)[!name_match]
+```
+
+Fix misspellings
+
+```{r}
+# Misspellings
+scs_unq$Species[scs_unq$Species == "Felix catus"] <- "Felis catus"
+scs_unq$Species[scs_unq$Species == "Rarrus rattus"] <- "Rattus rattus"
+scs_unq$Species[scs_unq$Species == "italicum"] <- "Arum italicum"
+scs_unq$Species[scs_unq$Species == "Cylindroptunia sp."] <- "Cylindropuntia sp."
+scs_unq$Species[scs_unq$Species == "Bos taurus "] <- "Bos taurus"
+scs_unq$Species[scs_unq$Species == "Andean ?otato latent tymovirus"] <- "Andean potato latent tymovirus"
+scs_unq$Species[scs_unq$Species == " Proposis juliflora"] <- "Proposis juliflora"
+scs_unq$Species[scs_unq$Species == " Proposis velutina"] <- "Proposis velutina"
+scs_unq$Species[scs_unq$Species == " Solenopsis richteri"] <- "Solenopsis richteri"
+scs_unq$Species[scs_unq$Species == "Gaeumannomyces graminis\x86var.\x86tritici"] <- "Gaeumannomyces graminis var. tritici"
+scs_unq$Species[scs_unq$Species == "Spartina\xa0spp."] <- "Spartina spp."
+scs_unq$Species[scs_unq$Species == "Candidatus\xa0liberibacter"] <- "Candidatus liberibacter"
+scs_unq$Species[scs_unq$Species == "Casuarina equisetifolia "] <- "Casuarina equisetifolia"
+scs_unq$Species[scs_unq$Species == "Tilletia Indica"] <- "Tilletia indica"
+scs_unq$Species[scs_unq$Species == "Ralstonia Solanacearum"] <- "Ralstonia solanacearum"
+scs_unq$Species[scs_unq$Species == "Pacifastacus Leniusculus"] <- "Pacifastacus leniusculus"
+scs_unq$Species[scs_unq$Species == "Opuntia ficus-indica "] <- "Opuntia ficus-indica"
+scs_unq$Species[scs_unq$Species == "Blatella germanica"] <- "Blattella germanica"
+scs_unq$Species[scs_unq$Species == "Peach  rosette  mosaic  nepovirus "] <- "Peach  rosette  mosaic  nepovirus"
+scs_unq$Species[scs_unq$Species == "Oligonychus metasequoia"] <- "Oligonychus metasequoiae" 
+scs_unq$Species[scs_unq$Species == "Proposis pallida"] <- "Prosopis pallida"
+scs_unq$Species[scs_unq$Species == "Proposis gladulosa"] <- "Prosopis gladulosa"
+scs_unq$Species[scs_unq$Species == "Proposis juliflora"] <- "Prosopis juliflora"
+scs_unq$Species[scs_unq$Species == "Proposis velutina"] <- "Prosopis velutina" 
+scs_unq$Species[scs_unq$Species == "Robinia pseudoaccia"] <- "Robinia pseudoacacia"
+scs_unq$Species[scs_unq$Species == "Cercis siliquatrum"] <- "Cercis siliquastrum"
+scs_unq$Species[scs_unq$Species == "Lymantria disparasiatica"] <- "Lymantria dispar asiatica"
+scs_unq$Species[scs_unq$Species == "Syrindodium filiformis"] <- "Syrindodium filiforme"
+scs_unq$Species[scs_unq$Species == "Clerodendrum chinese"] <- "Clerodendrum chinense"
+```
+
+Look fixed list up again and get only species with exact matches in GBIF.
+
+```{r, eval = FALSE}
+gbif_lookup <- 
+  lapply(unique(scs_unq$Species), 
+         rgbif::name_lookup, 
+         verbose = FALSE)
+
+name_match <- 
+  sapply(1:length(unique(scs_unq$Species)), 
+         function(i){
+           
+           unique(scs_unq$Species)[i] %in%
+             c(gbif_lookup[[i]]$data$species, 
+               gbif_lookup[[i]]$data$scientificName)
+           
+         })
+
+scs_unq <- 
+  scs_unq[scs_unq$Species %in% unique(scs_unq$Species)[name_match],]
+
+scs_unq <- 
+  scs_unq[!stringr::str_detect(scs_unq$Species, "\\."),]
+```
+
+List country of occurrence for each species
+
+```{r, eval = FALSE}
+country_species <-
+  pbapply::pblapply(unique(scs_unq$Species), function(x){
+    
+    print(x)
+    
+    occ_data <-
+      rgbif::occ_data(scientificName = x)$data
+    
+    if(is.null(occ_data)|!"country" %in% names(occ_data)) return(NULL)
+    
+    countries <- occ_data$country[!is.na(occ_data$country)]
+    
+    unq_ind <- 
+      tapply(seq_along(countries), 
+             countries, 
+             identity)[unique(countries)]
+    
+    continents <-
+      sapply(unq_ind, function(ui){
+        
+        occ_data[!is.na(occ_data$country),]$continent[ui] %>% 
+          unique() %>% 
+          paste(collapse = "/")
+        
+      })
+    
+    data.frame(sp = x, 
+               country = unique(countries),
+               continent = continents)
+    
+  }) %>% 
+  do.call(rbind, .)
 ```
