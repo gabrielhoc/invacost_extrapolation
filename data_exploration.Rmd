@@ -1,0 +1,121 @@
+---
+title: "InvaCost Spatial Extrapolation"
+author: "Gabriel Caetano, Ivan Jaric, Franck Courchamp"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: default
+  rmarkdown::html_vignette:
+  toc: true
+vignette: >
+  %\VignetteIndexEntry{pcpi} 
+  %\VignetteEngine{knitr::rmarkdown} 
+  %\VignetteEncoding{UTF-8}
+---
+
+# To do
+
+- Map species overlap per country
+- Find country-level predictors for each impacted sector (WorldBank database?)
+- Filter appropriate data
+- Filter only UN recognized countries? (Are these the only countries in WorldBank?)
+
+# Set up
+
+Install packages (turned off automatic evaluation so it doesn't try to intall them every time)
+
+```{r, eval = FALSE}
+install.packages("stringr")
+install.packages("rgbif")
+```
+
+Load packages
+
+```{r}
+library(magrittr)
+```
+
+Load data
+
+```{r}
+inva_db <-
+  read.csv("InvaCost_database_v4.1.csv")
+```
+
+# Data Exploration
+
+What does the database looks like?
+
+```{r}
+head(inva_db)
+```
+
+It seems the there are a few data points with multiple species, countries and impacted sectors. Let's create a new table with only unique combinations.
+
+```{r}
+scs_df <-
+  data.frame(
+    Species = inva_db$Species,
+    Official_country = inva_db$Official_country,
+    Impacted_sector  = inva_db$Impacted_sector)
+
+scs_unq <-
+  lapply(1:nrow(scs_df), function(r){
+    
+    row <- scs_df[r,]
+    #print(row.names(row))
+    row.names(row) <- NULL
+    
+    which_multi <- stringr::str_detect(row, "/")
+    
+    if(!any(which_multi)) return(row)
+    
+    split_cases <-
+      sapply(row[which_multi], stringr::str_split, "/")
+   
+    out <-
+      do.call(expand.grid, split_cases) %>% 
+      data.frame(row[!which_multi] )
+    
+    out[match(colnames(out), names(row))]
+    
+  }) %>% 
+  do.call(rbind, .)
+
+dim(scs_unq)
+```
+
+Fix some typos and remove unspecified countries and impact sector
+
+```{r}
+scs_unq$Impacted_sector[scs_unq$Impacted_sector == "Forestry " ] <- "Forestry"
+scs_unq$Impacted_sector[scs_unq$Impacted_sector == "Foresty" ] <- "Forestry"
+scs_unq$Impacted_sector[scs_unq$Impacted_sector == "Public and social welfare" ] <- "Public and Social Welfare"
+
+scs_unq$Official_country[scs_unq$Official_country == "Kanya" ] <- "Kenya"
+scs_unq$Official_country[scs_unq$Official_country == "Republic of Serbia" ] <- "Serbia"
+scs_unq$Official_country[scs_unq$Official_country == "The Bahamas" ] <- "Bahamas"
+scs_unq$Official_country[scs_unq$Official_country == "United Republic of Tanzania" ] <- "Tanzania"
+
+scs_unq <- scs_unq[!scs_unq$Impacted_sector %in% c("Unspecified"),]
+scs_unq <- scs_unq[!scs_unq$Official_country %in% c("31 countries",
+                                                    "African Countries",
+                                                    "Diverse",
+                                                    "EU27+",
+                                                    "Unspecified"),]
+
+scs_unq <- scs_unq[!duplicated(scs_unq),]
+
+dim(scs_unq)
+```
+# Get occurrence data for species from GBIF
+
+Look up species names in GBIF taxonomy (this may take a while)
+
+```{r}
+gbif_lookup <- 
+  lapply(unique(scs_unq$Species)[1:10], 
+         rgbif::name_lookup, 
+         verbose = FALSE)
+
+saveRDS(gbif_lookup, "gbif_lookup.rds")
+```
