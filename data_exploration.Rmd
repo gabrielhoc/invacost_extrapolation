@@ -14,7 +14,7 @@ vignette: >
 
 # To do
 
-- Map species overlap per country
+- How complete is our data? Map species overlap per country
 - Find country-level predictors for each impacted sector (WorldBank database?)
 - Filter appropriate data
 - Filter only UN recognized countries? (Are these the only countries in WorldBank?)
@@ -34,6 +34,7 @@ Load packages
 
 ```{r}
 library(magrittr)
+library(rgbif)
 ```
 
 Load data
@@ -83,6 +84,9 @@ scs_unq <-
   }) %>% 
   do.call(rbind, .)
 
+scs_unq <- 
+  scs_unq[!stringr::str_detect(scs_unq$Species, "\\."),]
+
 dim(scs_unq)
 ```
 
@@ -109,15 +113,16 @@ scs_unq <- scs_unq[!duplicated(scs_unq),]
 
 dim(scs_unq)
 ```
+
 # Get occurrence data for species from GBIF
 
 Look up species names in GBIF taxonomy (this may take a while)
 
 ```{r, eval = FALSE}
 gbif_lookup <- 
-  lapply(unique(scs_unq$Species), 
-         rgbif::name_lookup, 
-         verbose = FALSE)
+  pbapply::pblapply(unique(scs_unq$Species), 
+                    rgbif::name_lookup, 
+                    verbose = FALSE)
 
 saveRDS(gbif_lookup, "gbif_lookup.rds")
 ```
@@ -178,61 +183,125 @@ scs_unq$Species[scs_unq$Species == "Clerodendrum chinese"] <- "Clerodendrum chin
 Look fixed list up again and get only species with exact matches in GBIF.
 
 ```{r, eval = FALSE}
-gbif_lookup <- 
-  lapply(unique(scs_unq$Species), 
-         rgbif::name_lookup, 
-         verbose = FALSE)
+gbif_lookup2 <- 
+  pbapply::pblapply(unique(scs_unq$Species), 
+                    rgbif::name_lookup, 
+                    verbose = FALSE)
+
+saveRDS(gbif_lookup2, "gbif_lookup2.rds")
+```
+
+```{r}
+gbif_lookup2 <- readRDS("gbif_lookup2.rds")
 
 name_match <- 
   sapply(1:length(unique(scs_unq$Species)), 
          function(i){
            
            unique(scs_unq$Species)[i] %in%
-             c(gbif_lookup[[i]]$data$species, 
-               gbif_lookup[[i]]$data$scientificName)
+             c(gbif_lookup2[[i]]$data$species, 
+               gbif_lookup2[[i]]$data$scientificName)
            
          })
 
-scs_unq <- 
-  scs_unq[scs_unq$Species %in% unique(scs_unq$Species)[name_match],]
+unique(scs_unq$Species)[!name_match]
 
-scs_unq <- 
-  scs_unq[!stringr::str_detect(scs_unq$Species, "\\."),]
+scs_unq_gbif <- 
+  scs_unq[scs_unq$Species %in% unique(scs_unq$Species)[name_match],]
+```
+
+Get gbif taxon keys
+
+```{r}
+gbif_taxon_keys <- 
+  unique(scs_unq_gbif$Species) %>% 
+  rgbif::name_backbone_checklist() %>% 
+  dplyr::filter(!matchType == "NONE") %>%
+  dplyr::pull(usageKey) 
 ```
 
 List country of occurrence for each species
 
-```{r, eval = FALSE}
+```{r, warning=FALSE}
 country_species <-
-  pbapply::pblapply(unique(scs_unq$Species), function(x){
+  pbapply::pblapply(unique(scs_unq_gbif$Species), function(sp){
     
-    print(x)
+    gbif_taxon_key <- 
+      sp %>% 
+      rgbif::name_backbone_checklist() %>% 
+      dplyr::filter(!matchType == "NONE") %>%
+      dplyr::pull(usageKey) 
     
-    occ_data <-
-      rgbif::occ_data(scientificName = x)$data
+    countries <- 
+      rgbif::count_facet(gbif_taxon_key, 
+                         by = "country", 
+                         countries = 500)$country
     
-    if(is.null(occ_data)|!"country" %in% names(occ_data)) return(NULL)
-    
-    countries <- occ_data$country[!is.na(occ_data$country)]
-    
-    unq_ind <- 
-      tapply(seq_along(countries), 
-             countries, 
-             identity)[unique(countries)]
-    
-    continents <-
-      sapply(unq_ind, function(ui){
-        
-        occ_data[!is.na(occ_data$country),]$continent[ui] %>% 
-          unique() %>% 
-          paste(collapse = "/")
-        
-      })
-    
-    data.frame(sp = x, 
-               country = unique(countries),
-               continent = continents)
+    data.frame(sp = sp, 
+               country = countries)
     
   }) %>% 
   do.call(rbind, .)
+
+saveRDS(country_species, "country_species.rds")
+```
+
+```{r}
+scs_unq_gbif$Official_country[!scs_unq_gbif$Official_country %in% 
+                                rgbif::isocodes$name] %>% 
+  unique
+```
+
+```{r}
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "United States of America"] <- "United States"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Venezuela"] <- "Venezuela, Bolivarian Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Vietnam"] <- "Viet Nam"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Tanzania"] <- "Tanzania, United Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "South Korea"] <- "Korea, Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Russia"] <- "Russian Federation"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Brunei"] <- "Brunei Darussalam"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Laos"] <- "Lao People's Democratic Republic"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "East Timor"] <- "Timor-Leste"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Bolivia"] <- "Bolivia, Plurinational State of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Ivory Coast"] <- "Cote d'Ivoire"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Macedonia"] <- "Macedonia, the former Yugoslav Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Moldova"] <- "Moldova, Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Democratic Republic of the Congo"] <- "Congo, the Democratic Republic of the"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Iran"] <- "Iran, Islamic Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Federal States of Micronesia"] <- "Micronesia, Federated States of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Czechia"] <- "Czech Republic"
+
+scs_unq_gbif$iso2 <- 
+  rgbif::isocodes$code[match(scs_unq_gbif$Official_country,
+                             rgbif::isocodes$name)]
+
+scs_unq_gbif$iso2[scs_unq_gbif$Official_country == "Kosovo"] <- "XK"
+```
+
+Match country names
+
+```{r}
+country_species <- readRDS("country_species.rds")
+
+completeness_df <-
+  lapply(unique(scs_unq_gbif$iso2), 
+         function(cntr){
+           
+           inva_sp <-
+             scs_unq_gbif$Species[scs_unq_gbif$iso2 == cntr] %>% 
+             unique
+           
+           cntr_sp <-
+             country_species$sp[country_species$country == cntr] %>% 
+             unique
+           
+           sp_prop <- sum(inva_sp %in% cntr_sp)/length(cntr_sp) # double check if all inva_sp are in cntr_sp
+           
+           data.frame(country = iso2,
+                      sp_prop = sp_prop)
+           
+         }) %>% 
+  do.call(rbind, .)
+
+write.csv(completeness_df, "completeness_df.csv", row.names = FALSE)
 ```
