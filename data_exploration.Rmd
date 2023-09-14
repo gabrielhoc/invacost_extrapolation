@@ -18,10 +18,12 @@ vignette: >
 - Find country-level predictors for each impacted sector (WorldBank database?)
 - Filter appropriate data
 - Filter only UN recognized countries? (Are these the only countries in WorldBank?)
+- Why is aedes missing from Israel?
+- Solve Namibia
 
 # Set up
 
-Install packages (turned off automatic evaluation so it doesn't try to intall them every time)
+Install packages (turned off automatic evaluation so it doesn't try to install them every time)
 
 ```{r, eval = FALSE}
 install.packages("magrittr")
@@ -35,6 +37,7 @@ Load packages
 ```{r}
 library(magrittr)
 library(rgbif)
+library(ggplot2)
 ```
 
 Load data
@@ -90,7 +93,7 @@ scs_unq <-
 dim(scs_unq)
 ```
 
-Fix some typos and remove unspecified countries and impact sector
+Fix some typos and remove unspecified countries and impact sectors
 
 ```{r}
 scs_unq$Impacted_sector[scs_unq$Impacted_sector == "Forestry " ] <- "Forestry"
@@ -127,7 +130,7 @@ gbif_lookup <-
 saveRDS(gbif_lookup, "gbif_lookup.rds")
 ```
 
-See which names found no match on GBIF
+See which names found no match in GBIF
 
 ```{r, eval = FALSE}
 gbif_lookup <- readRDS("gbif_lookup.rds")
@@ -145,10 +148,10 @@ name_match <-
 unique(scs_unq$Species)[!name_match]
 ```
 
-Fix misspellings
+Fix mispellings
 
 ```{r}
-# Misspellings
+# Mispellings
 scs_unq$Species[scs_unq$Species == "Felix catus"] <- "Felis catus"
 scs_unq$Species[scs_unq$Species == "Rarrus rattus"] <- "Rattus rattus"
 scs_unq$Species[scs_unq$Species == "italicum"] <- "Arum italicum"
@@ -208,9 +211,13 @@ unique(scs_unq$Species)[!name_match]
 
 scs_unq_gbif <- 
   scs_unq[scs_unq$Species %in% unique(scs_unq$Species)[name_match],]
+
+scs_unq_gbif$iso2 <- 
+  rgbif::isocodes$code[match(scs_unq_gbif$Official_country,
+                             rgbif::isocodes$name)]
 ```
 
-Get gbif taxon keys
+Get GBIF taxon keys
 
 ```{r}
 gbif_taxon_keys <- 
@@ -222,63 +229,47 @@ gbif_taxon_keys <-
 
 List country of occurrence for each species
 
-```{r, warning=FALSE}
+```{r, warning = FALSE, eval = FALSE}
+gbif_taxon_key <- 
+  unique(scs_unq_gbif$Species) %>% 
+  rgbif::name_backbone_checklist() %>% 
+  dplyr::filter(!matchType == "NONE") %>%
+  dplyr::pull(usageKey) 
+
+pbapply::pblapply(877:length(gbif_taxon_key), function(i){
+  
+  countries <- 
+    rgbif::count_facet(gbif_taxon_key[i], 
+                       by = "country", 
+                       countries = 249)
+  
+  if(sum(countries$count) == 0) return(NULL)
+  
+  out <-
+    data.frame(sp = unique(scs_unq_gbif$Species)[i], 
+               country = countries$country[countries$count > 0])
+  
+  write.csv(out, paste0("country_sp_", i, ".csv"), row.names = FALSE)
+  
+})
+
 country_species <-
-  pbapply::pblapply(unique(scs_unq_gbif$Species), function(sp){
-    
-    gbif_taxon_key <- 
-      sp %>% 
-      rgbif::name_backbone_checklist() %>% 
-      dplyr::filter(!matchType == "NONE") %>%
-      dplyr::pull(usageKey) 
-    
-    countries <- 
-      rgbif::count_facet(gbif_taxon_key, 
-                         by = "country", 
-                         countries = 500)$country
-    
-    data.frame(sp = sp, 
-               country = countries)
-    
-  }) %>% 
+  pbapply::pblapply(list.files(pattern = "^country_sp_", 
+                               full.names = TRUE), 
+                    function(fl){
+                      
+                      read.csv(fl)
+                      
+                    }) %>% 
   do.call(rbind, .)
+
+country_species <- country_species[complete.cases(country_species),]
+scs_unq_gbif <- scs_unq_gbif[complete.cases(scs_unq_gbif),]
 
 saveRDS(country_species, "country_species.rds")
 ```
 
-```{r}
-scs_unq_gbif$Official_country[!scs_unq_gbif$Official_country %in% 
-                                rgbif::isocodes$name] %>% 
-  unique
-```
-
-```{r}
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "United States of America"] <- "United States"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Venezuela"] <- "Venezuela, Bolivarian Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Vietnam"] <- "Viet Nam"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Tanzania"] <- "Tanzania, United Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "South Korea"] <- "Korea, Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Russia"] <- "Russian Federation"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Brunei"] <- "Brunei Darussalam"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Laos"] <- "Lao People's Democratic Republic"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "East Timor"] <- "Timor-Leste"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Bolivia"] <- "Bolivia, Plurinational State of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Ivory Coast"] <- "Cote d'Ivoire"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Macedonia"] <- "Macedonia, the former Yugoslav Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Moldova"] <- "Moldova, Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Democratic Republic of the Congo"] <- "Congo, the Democratic Republic of the"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Iran"] <- "Iran, Islamic Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Federal States of Micronesia"] <- "Micronesia, Federated States of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Czechia"] <- "Czech Republic"
-
-scs_unq_gbif$iso2 <- 
-  rgbif::isocodes$code[match(scs_unq_gbif$Official_country,
-                             rgbif::isocodes$name)]
-
-scs_unq_gbif$iso2[scs_unq_gbif$Official_country == "Kosovo"] <- "XK"
-```
-
-Match country names
+Calculate proportion of sampled species per country
 
 ```{r}
 country_species <- readRDS("country_species.rds")
@@ -295,13 +286,110 @@ completeness_df <-
              country_species$sp[country_species$country == cntr] %>% 
              unique
            
-           sp_prop <- sum(inva_sp %in% cntr_sp)/length(cntr_sp) # double check if all inva_sp are in cntr_sp
+           sp_prop <- sum(inva_sp %in% cntr_sp)/length(cntr_sp)
            
-           data.frame(country = iso2,
+           data.frame(country = cntr,
                       sp_prop = sp_prop)
            
          }) %>% 
   do.call(rbind, .)
 
 write.csv(completeness_df, "completeness_df.csv", row.names = FALSE)
+```
+
+```{r}
+completeness_df[completeness_df$sp_prop > 0.1,] %>% 
+  ggplot(aes(x = country,
+             y = sp_prop)) +
+  geom_col() +
+  theme_classic()
+```
+
+```{r}
+completeness_sector_df <-
+  lapply(unique(scs_unq_gbif$Impacted_sector), function(sect){
+    
+    scs_unq_sect <- 
+      scs_unq_gbif[scs_unq_gbif$Impacted_sector == sect,]
+    
+    country_species_sect <- 
+      country_species[country_species$sp %in% scs_unq_sect$Species,]
+    
+    completeness_df_this_sect <-
+      lapply(unique(scs_unq_sect$iso2), 
+             function(cntr){
+               
+               inva_sp <-
+                 scs_unq_sect$Species[scs_unq_sect$iso2 == cntr] %>% 
+                 unique
+               
+               cntr_sp <-
+                 country_species_sect$sp[country_species_sect$country == cntr] %>% 
+                 unique
+               
+               sp_prop <- sum(inva_sp %in% cntr_sp)/length(cntr_sp)
+               
+               data.frame(country = cntr,
+                          sp_prop = sp_prop)
+               
+             }) %>% 
+      do.call(rbind, .)
+    
+    completeness_df_this_sect$sector <- sect
+    
+    completeness_df_this_sect
+    
+  }) %>% 
+  do.call(rbind, .)
+```
+
+```{r}
+completeness_sector_df[completeness_sector_df$sector == "Agriculture" &
+                         completeness_sector_df$sp_prop > 0.1,] %>% 
+  ggplot(aes(x = country,
+             y = sp_prop)) +
+  geom_col() +
+  theme_classic()
+
+completeness_sector_df[completeness_sector_df$sector == "Environment" &
+                         completeness_sector_df$sp_prop > 0.1,] %>% 
+  ggplot(aes(x = country,
+             y = sp_prop)) +
+  geom_col() +
+  theme_classic()
+
+completeness_sector_df[completeness_sector_df$sector == "Authorities-Stakeholders" &
+                         completeness_sector_df$sp_prop > 0.1,] %>% 
+  ggplot(aes(x = country,
+             y = sp_prop)) +
+  geom_col() +
+  theme_classic()
+
+completeness_sector_df[completeness_sector_df$sector == "Public and Social Welfare" &
+                         completeness_sector_df$sp_prop > 0.1,] %>% 
+  ggplot(aes(x = country,
+             y = sp_prop)) +
+  geom_col() +
+  theme_classic()
+
+completeness_sector_df[completeness_sector_df$sector == "Health" &
+                         completeness_sector_df$sp_prop > 0.1,] %>% 
+  ggplot(aes(x = country,
+             y = sp_prop)) +
+  geom_col() +
+  theme_classic()
+
+completeness_sector_df[completeness_sector_df$sector == "Forestry" &
+                         completeness_sector_df$sp_prop > 0.1,] %>% 
+  ggplot(aes(x = country,
+             y = sp_prop)) +
+  geom_col() +
+  theme_classic()
+
+completeness_sector_df[completeness_sector_df$sector == "Fishery" &
+                         completeness_sector_df$sp_prop > 0.1,] %>% 
+  ggplot(aes(x = country,
+             y = sp_prop)) +
+  geom_col() +
+  theme_classic()
 ```
