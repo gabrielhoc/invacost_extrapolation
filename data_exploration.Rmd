@@ -18,7 +18,6 @@ vignette: >
 - Find country-level predictors for each impacted sector (WorldBank database?)
 - Filter appropriate data
 - Filter only UN recognized countries? (Are these the only countries in WorldBank?)
-- Why is aedes missing from Israel?
 - Solve Namibia
 
 # Set up
@@ -30,6 +29,7 @@ install.packages("magrittr")
 install.packages("stringr")
 install.packages("rgbif")
 install.packages("pbapply")
+install.packages("forcats")
 ```
 
 Load packages
@@ -44,7 +44,7 @@ Load data
 
 ```{r}
 inva_db <-
-  read.csv("InvaCost_database_v4.1.csv")
+  invacost::getInvaCostVersion()
 ```
 
 # Data Exploration
@@ -63,6 +63,8 @@ scs_df <-
     Species = inva_db$Species,
     Official_country = inva_db$Official_country,
     Impacted_sector  = inva_db$Impacted_sector)
+
+scs_df <- scs_df[complete.cases(scs_df),]
 
 scs_unq <-
   lapply(1:nrow(scs_df), function(r){
@@ -117,7 +119,7 @@ scs_unq <- scs_unq[!duplicated(scs_unq),]
 dim(scs_unq)
 ```
 
-# Get occurrence data for species from GBIF
+# Completeness analysis
 
 Look up species names in GBIF taxonomy (this may take a while)
 
@@ -173,13 +175,13 @@ scs_unq$Species[scs_unq$Species == "Blatella germanica"] <- "Blattella germanica
 scs_unq$Species[scs_unq$Species == "Peach  rosette  mosaic  nepovirus "] <- "Peach  rosette  mosaic  nepovirus"
 scs_unq$Species[scs_unq$Species == "Oligonychus metasequoia"] <- "Oligonychus metasequoiae" 
 scs_unq$Species[scs_unq$Species == "Proposis pallida"] <- "Prosopis pallida"
-scs_unq$Species[scs_unq$Species == "Proposis gladulosa"] <- "Prosopis gladulosa"
+scs_unq$Species[scs_unq$Species == "Proposis gladulosa"] <- "Prosopis glandulosa"
 scs_unq$Species[scs_unq$Species == "Proposis juliflora"] <- "Prosopis juliflora"
 scs_unq$Species[scs_unq$Species == "Proposis velutina"] <- "Prosopis velutina" 
 scs_unq$Species[scs_unq$Species == "Robinia pseudoaccia"] <- "Robinia pseudoacacia"
 scs_unq$Species[scs_unq$Species == "Cercis siliquatrum"] <- "Cercis siliquastrum"
 scs_unq$Species[scs_unq$Species == "Lymantria disparasiatica"] <- "Lymantria dispar asiatica"
-scs_unq$Species[scs_unq$Species == "Syrindodium filiformis"] <- "Syrindodium filiforme"
+scs_unq$Species[scs_unq$Species == "Syrindodium filiformis"] <- "Syringodium filiforme"
 scs_unq$Species[scs_unq$Species == "Clerodendrum chinese"] <- "Clerodendrum chinense"
 ```
 
@@ -212,9 +214,29 @@ unique(scs_unq$Species)[!name_match]
 scs_unq_gbif <- 
   scs_unq[scs_unq$Species %in% unique(scs_unq$Species)[name_match],]
 
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "United States of America"] <- "United States"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Venezuela"] <- "Venezuela, Bolivarian Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Vietnam"] <- "Viet Nam"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Tanzania"] <- "Tanzania, United Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "South Korea"] <- "Korea, Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Russia"] <- "Russian Federation"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Brunei"] <- "Brunei Darussalam"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Laos"] <- "Lao People's Democratic Republic"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "East Timor"] <- "Timor-Leste"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Bolivia"] <- "Bolivia, Plurinational State of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Ivory Coast"] <- "Cote d'Ivoire"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Macedonia"] <- "Macedonia, the former Yugoslav Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Moldova"] <- "Moldova, Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Democratic Republic of the Congo"] <- "Congo, the Democratic Republic of the"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Iran"] <- "Iran, Islamic Republic of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Federal States of Micronesia"] <- "Micronesia, Federated States of"
+scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Czechia"] <- "Czech Republic"
+
 scs_unq_gbif$iso2 <- 
   rgbif::isocodes$code[match(scs_unq_gbif$Official_country,
                              rgbif::isocodes$name)]
+
+scs_unq_gbif$iso2[scs_unq_gbif$Official_country == "Kosovo"] <- "XK"
 ```
 
 Get GBIF taxon keys
@@ -236,7 +258,7 @@ gbif_taxon_key <-
   dplyr::filter(!matchType == "NONE") %>%
   dplyr::pull(usageKey) 
 
-pbapply::pblapply(877:length(gbif_taxon_key), function(i){
+pbapply::pblapply(1:length(gbif_taxon_key), function(i){
   
   countries <- 
     rgbif::count_facet(gbif_taxon_key[i], 
@@ -297,13 +319,18 @@ completeness_df <-
 write.csv(completeness_df, "completeness_df.csv", row.names = FALSE)
 ```
 
+Plot countries with more than 10% data completeness
+
 ```{r}
 completeness_df[completeness_df$sp_prop > 0.1,] %>% 
-  ggplot(aes(x = country,
-             y = sp_prop)) +
+  ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
+             y = sp_prop,
+             fill = sp_prop)) +
   geom_col() +
   theme_classic()
 ```
+
+Separate data by impacted sector
 
 ```{r}
 completeness_sector_df <-
@@ -343,53 +370,235 @@ completeness_sector_df <-
   do.call(rbind, .)
 ```
 
+Plot countries with more than 10% data completeness for each impacted sector
+
 ```{r}
 completeness_sector_df[completeness_sector_df$sector == "Agriculture" &
                          completeness_sector_df$sp_prop > 0.1,] %>% 
-  ggplot(aes(x = country,
-             y = sp_prop)) +
+  ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
+             y = sp_prop,
+             fill = sp_prop)) +
   geom_col() +
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Environment" &
                          completeness_sector_df$sp_prop > 0.1,] %>% 
-  ggplot(aes(x = country,
-             y = sp_prop)) +
+  ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
+             y = sp_prop,
+             fill = sp_prop)) +
   geom_col() +
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Authorities-Stakeholders" &
                          completeness_sector_df$sp_prop > 0.1,] %>% 
-  ggplot(aes(x = country,
-             y = sp_prop)) +
+  ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
+             y = sp_prop,
+             fill = sp_prop)) +
   geom_col() +
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Public and Social Welfare" &
                          completeness_sector_df$sp_prop > 0.1,] %>% 
-  ggplot(aes(x = country,
-             y = sp_prop)) +
+  ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
+             y = sp_prop,
+             fill = sp_prop)) +
   geom_col() +
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Health" &
                          completeness_sector_df$sp_prop > 0.1,] %>% 
-  ggplot(aes(x = country,
-             y = sp_prop)) +
+  ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
+             y = sp_prop,
+             fill = sp_prop)) +
   geom_col() +
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Forestry" &
                          completeness_sector_df$sp_prop > 0.1,] %>% 
-  ggplot(aes(x = country,
-             y = sp_prop)) +
+  ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
+             y = sp_prop,
+             fill = sp_prop)) +
   geom_col() +
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Fishery" &
                          completeness_sector_df$sp_prop > 0.1,] %>% 
-  ggplot(aes(x = country,
-             y = sp_prop)) +
+  ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
+             y = sp_prop,
+             fill = sp_prop)) +
   geom_col() +
   theme_classic()
+```
+
+# Cost distribution analysis
+
+Divide records with multiple taxa, sector, environment
+
+```{r}
+psce_df <-
+  data.frame(
+    Phylum = inva_db$Phylum,
+    Sector  = inva_db$Impacted_sector,
+    Cost = inva_db$Cost_estimate_per_year_2017_USD_PPP,
+    Environment = inva_db$Environment)
+
+psce_df <- psce_df[complete.cases(psce_df),]
+
+psce_unq <-
+  lapply(1:nrow(psce_df), function(r){
+    
+    row <- psce_df[r,]
+    #print(row.names(row))
+    row.names(row) <- NULL
+    
+    which_multi <- stringr::str_detect(row, "/")
+    
+    if(!any(which_multi)) return(row)
+    
+    split_cases <-
+      sapply(row[which_multi], stringr::str_split, "/")
+    
+    out <-
+      do.call(expand.grid, split_cases) %>% 
+      data.frame(row[!which_multi] )
+    
+    out[match(colnames(out), names(row))]
+    
+  }) %>% 
+  do.call(rbind, .)
+
+psce_unq$Sector[psce_unq$Sector == "Forestry " ] <- "Forestry"
+psce_unq$Environment[psce_unq$Environment == "Semi-aquatic" ] <- "Semi-Aquatic"
+
+dim(psce_unq)
+```
+
+Group Phylla into broader groups
+
+```{r}
+psce_unq$Phylum %>% unique
+
+psce_unq <- psce_unq[!psce_unq$Phylum %in% c("Diverse", "Unspecified"),]
+psce_unq <- psce_unq[!psce_unq$Environment %in% c("Diverse", "Unspecified", "Semi-Aquatic"),]
+
+psce_unq$Group <- NA
+psce_unq$Group[psce_unq$Phylum == "Chordata"] <- "Vertebrates"
+
+psce_unq$Group[psce_unq$Phylum == "Arthropoda"] <- "Arthropods"
+
+psce_unq$Group[psce_unq$Phylum == "Nematoda"] <- "Invertebrates"          
+psce_unq$Group[psce_unq$Phylum == "Platyhelminthes"] <- "Invertebrates"
+psce_unq$Group[psce_unq$Phylum == "Annelida"] <- "Invertebrates"
+psce_unq$Group[psce_unq$Phylum == "Cnidaria"] <- "Invertebrates"
+psce_unq$Group[psce_unq$Phylum == "Mollusca"] <- "Invertebrates"  
+
+psce_unq$Group[psce_unq$Phylum == "Tracheophyta"] <- "Plants" 
+psce_unq$Group[psce_unq$Phylum == "Ochrophyta"] <- "Plants"
+psce_unq$Group[psce_unq$Phylum == "Chlorophyta"] <- "Plants"
+
+psce_unq$Group[psce_unq$Phylum == "Oomycota"] <- "Fungi"     
+psce_unq$Group[psce_unq$Phylum == "Basidiomycota"] <- "Fungi"
+psce_unq$Group[psce_unq$Phylum == "Basidiomycota"] <- "Fungi"
+psce_unq$Group[psce_unq$Phylum == "Chytridiomycota"] <- "Fungi"
+psce_unq$Group[psce_unq$Phylum == "Ascomycota"] <- "Fungi"
+psce_unq$Group[psce_unq$Phylum == "Ascomyceta"] <- "Fungi"
+
+psce_unq$Group[psce_unq$Phylum == "Proteobacteria"] <- "Microbes" 
+psce_unq$Group[psce_unq$Phylum == "Cressdnaviricota"] <- "Microbes"            
+psce_unq$Group[psce_unq$Phylum == "Negarnaviricota"] <- "Microbes"   
+psce_unq$Group[psce_unq$Phylum == "Pisuviricota"] <- "Microbes"       
+psce_unq$Group[psce_unq$Phylum == "Kitrinoviricota"] <- "Microbes"    
+psce_unq$Group[psce_unq$Phylum == "Nucleocytoviricota"] <- "Microbes"           
+psce_unq$Group[psce_unq$Phylum == "Peploviricota"] <- "Microbes" 
+```
+
+Plot cost distribution by group and sector, for each environment
+
+```{r}
+psce_unq %>% 
+  ggplot(aes(x = Sector, 
+             y = log(Cost))) +
+  geom_boxplot() + 
+  theme_classic()
+
+psce_unq %>% 
+  ggplot(aes(x = Group, 
+             y = log(Cost))) +
+  geom_boxplot() + 
+  theme_classic()
+
+psce_unq %>% 
+  ggplot(aes(x = Sector, 
+             y = log(Cost),
+             fill = Group)) +
+  geom_boxplot() + 
+  theme_classic()
+
+psce_unq[psce_unq$Environment == "Aquatic",] %>% 
+  ggplot(aes(x = Sector, 
+             y = log(Cost),
+             fill = Group)) +
+  geom_boxplot() + 
+  theme_classic()
+
+psce_unq[psce_unq$Environment == "Terrestrial",] %>% 
+  ggplot(aes(x = Sector, 
+             y = log(Cost),
+             fill = Group)) +
+  geom_boxplot() + 
+  theme_classic()
+```
+
+# Fit random forest without country data
+
+Log and scale cost data
+
+```{r}
+set.seed(1)
+
+psce_unq$log_Cost <- log(psce_unq$Cost)
+psce_unq$log_Cost <- psce_unq$log_Cost/max(psce_unq$log_Cost)
+```
+
+Partition data
+
+```{r}
+part_ind <- 
+  caret::createDataPartition(y=psce_unq$log_Cost, 
+                             p=0.7, 
+                             list=FALSE)
+
+psce_train <- psce_unq[part_ind, ]
+psce_test <- psce_unq[-part_ind, ]
+```
+
+Fit Random Forest model
+
+```{r, eval = FALSE}
+set.seed(1)
+
+psce_rf <- 
+  caret::train(log_Cost ~ Sector + Group + Environment, 
+               method='rf', 
+               trControl= caret::trainControl(method = 'repeatedcv', 
+                                              number = 5, 
+                                              repeats = 3),
+               metric='RMSE',
+               data = psce_unq)
+
+saveRDS(psce_rf, "psce_rf.rds")
+```
+
+Cross-validate
+
+```{r}
+psce_rf <- readRDS("psce_rf.rds")
+
+psce_rf$finalModel
+
+pred_psce_rf <- 
+  predict(psce_rf, 
+          psce_test[, -3])
+
+1 - mean((pred_psce_rf - psce_test$log_Cost)^2)/var(psce_test$log_Cost)
 ```
