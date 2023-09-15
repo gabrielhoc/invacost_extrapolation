@@ -14,11 +14,12 @@ vignette: >
 
 # To do
 
-- How complete is our data? Map species overlap per country
-- Find country-level predictors for each impacted sector (WorldBank database?)
+- Find country-level predictors for each impacted sector (WorldBank database? package wbstats)
 - Filter appropriate data
 - Filter only UN recognized countries? (Are these the only countries in WorldBank?)
 - Solve Namibia
+- Solve Kosovo
+- Include instalation of all packages
 
 # Set up
 
@@ -29,7 +30,9 @@ install.packages("magrittr")
 install.packages("stringr")
 install.packages("rgbif")
 install.packages("pbapply")
+install.packages("caret")
 install.packages("forcats")
+install.packages("wbstats")
 ```
 
 Load packages
@@ -584,7 +587,7 @@ psce_rf <-
                                               number = 5, 
                                               repeats = 3),
                metric='RMSE',
-               data = psce_unq)
+               data = psce_train)
 
 saveRDS(psce_rf, "psce_rf.rds")
 ```
@@ -602,3 +605,14 @@ pred_psce_rf <-
 
 1 - mean((pred_psce_rf - psce_test$log_Cost)^2)/var(psce_test$log_Cost)
 ```
+
+```{r}
+psce_boruta <- 
+  Boruta::Boruta(log_Cost ~ Sector + Group + Environment,
+                 psce_train)
+
+plot(psce_boruta)
+```
+
+# Get country data from WorldBank
+
