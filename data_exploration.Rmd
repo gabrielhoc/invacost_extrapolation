@@ -14,12 +14,8 @@ vignette: >
 
 # To do
 
-- Find country-level predictors for each impacted sector (WorldBank database? package wbstats)
-- Filter appropriate data
-- Filter only UN recognized countries? (Are these the only countries in WorldBank?)
-- Solve Namibia
-- Solve Kosovo
-- Include instalation of all packages
+- Filter appropriate data (low reliability and potential costs)
+- Include installation of all packages
 
 # Set up
 
@@ -58,14 +54,49 @@ What does the database looks like?
 head(inva_db)
 ```
 
+Remove low reliability data points, get only data points at country level, and also only data points with unique species, country and sector
+
+```{r}
+inva_db_clean <- 
+  inva_db[inva_db$Method_reliability == "High" & 
+            inva_db$Spatial_scale == "Country" &
+            !stringr::str_detect(inva_db$Species, "/") &
+            !stringr::str_detect(inva_db$Official_country, "/") &
+            !stringr::str_detect(inva_db$Impacted_sector, "/"),]
+```
+
+Fix some typos and remove unspecified countries and impact sectors
+
+```{r}
+inva_db_clean$Impacted_sector[inva_db_clean$Impacted_sector == "Forestry " ] <- "Forestry"
+inva_db_clean$Impacted_sector[inva_db_clean$Impacted_sector == "Foresty" ] <- "Forestry"
+inva_db_clean$Impacted_sector[inva_db_clean$Impacted_sector == "Public and social welfare" ] <- "Public and Social Welfare"
+
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Kanya" ] <- "Kenya"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Republic of Serbia" ] <- "Serbia"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "The Bahamas" ] <- "Bahamas"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "United Republic of Tanzania" ] <- "Tanzania"
+
+inva_db_clean <- inva_db_clean[!inva_db_clean$Impacted_sector %in% c("Unspecified"),]
+inva_db_clean <- inva_db_clean[!inva_db_clean$Official_country %in% c("31 countries",
+                                                    "African Countries",
+                                                    "Diverse",
+                                                    "EU27+",
+                                                    "Unspecified"),]
+
+inva_db_clean <- inva_db_clean[!duplicated(inva_db_clean),]
+
+dim(inva_db_clean)
+```
+
 It seems the there are a few data points with multiple species, countries and impacted sectors. Let's create a new table with only unique combinations.
 
 ```{r}
 scs_df <-
   data.frame(
-    Species = inva_db$Species,
-    Official_country = inva_db$Official_country,
-    Impacted_sector  = inva_db$Impacted_sector)
+    Species = inva_db_clean$Species,
+    Official_country = inva_db_clean$Official_country,
+    Impacted_sector  = inva_db_clean$Impacted_sector)
 
 scs_df <- scs_df[complete.cases(scs_df),]
 
@@ -94,30 +125,6 @@ scs_unq <-
 
 scs_unq <- 
   scs_unq[!stringr::str_detect(scs_unq$Species, "\\."),]
-
-dim(scs_unq)
-```
-
-Fix some typos and remove unspecified countries and impact sectors
-
-```{r}
-scs_unq$Impacted_sector[scs_unq$Impacted_sector == "Forestry " ] <- "Forestry"
-scs_unq$Impacted_sector[scs_unq$Impacted_sector == "Foresty" ] <- "Forestry"
-scs_unq$Impacted_sector[scs_unq$Impacted_sector == "Public and social welfare" ] <- "Public and Social Welfare"
-
-scs_unq$Official_country[scs_unq$Official_country == "Kanya" ] <- "Kenya"
-scs_unq$Official_country[scs_unq$Official_country == "Republic of Serbia" ] <- "Serbia"
-scs_unq$Official_country[scs_unq$Official_country == "The Bahamas" ] <- "Bahamas"
-scs_unq$Official_country[scs_unq$Official_country == "United Republic of Tanzania" ] <- "Tanzania"
-
-scs_unq <- scs_unq[!scs_unq$Impacted_sector %in% c("Unspecified"),]
-scs_unq <- scs_unq[!scs_unq$Official_country %in% c("31 countries",
-                                                    "African Countries",
-                                                    "Diverse",
-                                                    "EU27+",
-                                                    "Unspecified"),]
-
-scs_unq <- scs_unq[!duplicated(scs_unq),]
 
 dim(scs_unq)
 ```
@@ -435,43 +442,17 @@ completeness_sector_df[completeness_sector_df$sector == "Fishery" &
 
 # Cost distribution analysis
 
-Divide records with multiple taxa, sector, environment
+Select only phylum, sector, environment and cost
 
 ```{r}
 psce_df <-
   data.frame(
-    Phylum = inva_db$Phylum,
-    Sector  = inva_db$Impacted_sector,
-    Cost = inva_db$Cost_estimate_per_year_2017_USD_PPP,
-    Environment = inva_db$Environment)
+    Phylum = inva_db_clean$Phylum,
+    Sector  = inva_db_clean$Impacted_sector,
+    Environment = inva_db_clean$Environment,
+    Cost = inva_db_clean$Cost_estimate_per_year_2017_USD_PPP)
 
-psce_df <- psce_df[complete.cases(psce_df),]
-
-psce_unq <-
-  lapply(1:nrow(psce_df), function(r){
-    
-    row <- psce_df[r,]
-    #print(row.names(row))
-    row.names(row) <- NULL
-    
-    which_multi <- stringr::str_detect(row, "/")
-    
-    if(!any(which_multi)) return(row)
-    
-    split_cases <-
-      sapply(row[which_multi], stringr::str_split, "/")
-    
-    out <-
-      do.call(expand.grid, split_cases) %>% 
-      data.frame(row[!which_multi] )
-    
-    out[match(colnames(out), names(row))]
-    
-  }) %>% 
-  do.call(rbind, .)
-
-psce_unq$Sector[psce_unq$Sector == "Forestry " ] <- "Forestry"
-psce_unq$Environment[psce_unq$Environment == "Semi-aquatic" ] <- "Semi-Aquatic"
+psce_unq <- psce_df[complete.cases(psce_df),]
 
 dim(psce_unq)
 ```
@@ -481,7 +462,7 @@ Group Phylla into broader groups
 ```{r}
 psce_unq$Phylum %>% unique
 
-psce_unq <- psce_unq[!psce_unq$Phylum %in% c("Diverse", "Unspecified"),]
+psce_unq <- psce_unq[!psce_unq$Phylum %in% c("Diverse", "Unspecified", "Diverse/Unspecified"),]
 psce_unq <- psce_unq[!psce_unq$Environment %in% c("Diverse", "Unspecified", "Semi-Aquatic"),]
 
 psce_unq$Group <- NA
@@ -577,7 +558,7 @@ psce_test <- psce_unq[-part_ind, ]
 
 Fit Random Forest model
 
-```{r, eval = FALSE}
+```{r}
 set.seed(1)
 
 psce_rf <- 
@@ -597,14 +578,16 @@ Cross-validate
 ```{r}
 psce_rf <- readRDS("psce_rf.rds")
 
-psce_rf$finalModel
+# psce_rf$finalModel
 
 pred_psce_rf <- 
   predict(psce_rf, 
-          psce_test[, -3])
+          psce_test)
 
 1 - mean((pred_psce_rf - psce_test$log_Cost)^2)/var(psce_test$log_Cost)
 ```
+
+Check variable importance with Boruta
 
 ```{r}
 psce_boruta <- 
@@ -616,3 +599,168 @@ plot(psce_boruta)
 
 # Get country data from WorldBank
 
+Find which indicators are available for what countries
+
+```{r}
+cachelist <- wbstats::wb_cache()
+```
+
+Download all indicators from WorldBank and extract country information
+
+```{r, eval = FALSE, warning = FALSE}
+to_download <- 1:length(cachelist$indicators$indicator_id)
+
+# In case downloading is interrupted:
+all_files <- 1:length(cachelist$indicators$indicator_id)
+downloaded_files <-
+  list.files(pattern = "^indicator_") %>%
+  stringr::str_sub(11, -5) %>%
+  as.numeric()
+to_download <- all_files[!all_files %in% downloaded_files]
+
+inds_cntr <- 
+  pbapply::pblapply(to_download, 
+                    function(i){
+                      
+                      #print(i)
+                      ind <- cachelist$indicators$indicator_id[i]
+                      
+                      this_ind <- 
+                        try(wbstats::wb_data(ind, mrnev = 1), silent = TRUE)
+                      
+                      if(class(this_ind)[1] == "try-error"){
+                        
+                        return(this_ind)
+                        
+                      } else if(ncol(this_ind) == 0){ 
+                        
+                        return(NULL)
+                        
+                      } else {
+                        
+                        saveRDS(this_ind$iso2c[!is.na(this_ind[5])],
+                                paste0("indicator_", i, ".rds"))
+                        
+                        this_ind$iso2c[!is.na(this_ind[5])]
+                        
+                      }
+                      
+                    })
+```
+
+Read all in a single table
+
+```{r}
+inds_cntr <-
+  pbapply::pblapply(list.files(pattern = "^indicator_", 
+                               full.names = TRUE), 
+                    function(fl){
+                      
+                      readRDS(fl)
+                      
+                    })
+
+dl_index <-
+  list.files(pattern = "^indicator_") %>%
+  stringr::str_sub(11, -5) %>%
+  as.numeric()
+
+names(inds_cntr) <- cachelist$indicators$indicator_id[dl_index]
+
+saveRDS(inds_cntr, "inds_cntr.rds")
+```
+
+Get only indicators available for all UN member states in InvaCost
+
+```{r}
+inva_cntr <- unique(scs_unq_gbif$iso2)
+un_members <- read.csv("un_members.csv")
+un_members$iso2 <- stringr::str_sub(un_members$iso2, 1, 2)
+
+inva_cntr <- inva_cntr[inva_cntr %in% un_members$iso2]
+
+compl_index <-
+  sapply(inds_cntr, function(x) sum(inva_cntr %in% x) == length(inva_cntr))
+
+compl_indicators <- names(inds_cntr)[compl_index]
+
+complete_indicators <-
+  cachelist$indicators[cachelist$indicators$indicator_id %in% compl_indicators,]
+
+write.csv(complete_indicators[-6], 
+          "complete_indicators.csv", 
+          row.names = FALSE)
+```
+
+# Scrape GISD
+
+Scrape the GISD website to find where species are native and where they are invasive
+
+```{r, eval = FALSE}
+gisd_table <-
+  pbapply::pblapply(1:2099, function(i){
+    
+    Sys.sleep(0.5)
+    
+    url <- paste0("http://www.iucngisd.org/gisd/species.php?sc=", i)
+    
+    sp_html <-
+      rvest::read_html(url)
+    
+    all_elements <-
+      rvest::html_elements(sp_html, "div")
+    
+    element_id <- 
+      rvest::html_attr(all_elements, "id")
+    
+    if("ar-col" %in% element_id & 
+       "nr-col" %in% element_id){
+      
+      sp_name <- all_elements[which(element_id == "spe-title")] %>% rvest::html_text2()
+      alien_range <- all_elements[which(element_id == "ar-col")] %>% rvest::html_text2()
+      native_range <- all_elements[which(element_id == "nr-col")] %>% rvest::html_text2()
+      
+      split_ar <-
+        stringr::str_split(alien_range, "\n")[[1]][-c(1:3)]
+      
+      split_nr <-
+        stringr::str_split(native_range, "\n")[[1]][-c(1:3)]
+      
+      if(length(split_nr) == 0) split_nr <- NULL
+      
+      if(length(split_ar) > 0){
+        
+        split_ar_fixed <-
+          sapply(1:length(split_ar), function(r){
+            
+            stringr::str_sub(split_ar[r], stringr::str_locate(split_ar, "] ")[r,2] + 1)
+            
+          })
+        
+      } else {split_ar_fixed <- NULL}
+      
+      
+      data.frame(sp = sp_name, 
+                 country = c(split_ar_fixed, split_nr), 
+                 status = c(rep("invasive", length(split_ar_fixed)),
+                   rep("native", length(split_nr))))
+      
+    } else { NULL }
+    
+  }) %>% 
+  do.call(rbind, .)
+
+write.csv(gisd_table, "gisd_table.csv")
+```
+
+See how many of the species in InvaCost filtered have data in GISD
+
+```{r}
+gisd_table <- read.csv("gisd_table.csv")
+  
+sp_inva <- 
+  inva_db_clean$Species[!stringr::str_detect(inva_db_clean$Species, "\\.")] %>% 
+  unique
+
+sum(sp_inva %in% gisd_table$sp)/length(sp_inva)
+```
