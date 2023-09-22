@@ -14,8 +14,11 @@ vignette: >
 
 # To do
 
-- Filter appropriate data (low reliability and potential costs)
 - Include installation of all packages
+- Find better records of invasive species distribution
+- Adjust RF hyperparameters
+- add time since introduction
+- use taxonomic groups in Seebens 2017?
 
 # Set up
 
@@ -60,6 +63,7 @@ Remove low reliability data points, get only data points at country level, and a
 inva_db_clean <- 
   inva_db[inva_db$Method_reliability == "High" & 
             inva_db$Spatial_scale == "Country" &
+            inva_db$Implementation == "Observed" &
             !stringr::str_detect(inva_db$Species, "/") &
             !stringr::str_detect(inva_db$Official_country, "/") &
             !stringr::str_detect(inva_db$Impacted_sector, "/"),]
@@ -76,13 +80,30 @@ inva_db_clean$Official_country[inva_db_clean$Official_country == "Kanya" ] <- "K
 inva_db_clean$Official_country[inva_db_clean$Official_country == "Republic of Serbia" ] <- "Serbia"
 inva_db_clean$Official_country[inva_db_clean$Official_country == "The Bahamas" ] <- "Bahamas"
 inva_db_clean$Official_country[inva_db_clean$Official_country == "United Republic of Tanzania" ] <- "Tanzania"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "United States of America"] <- "United States"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Venezuela"] <- "Venezuela, Bolivarian Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Vietnam"] <- "Viet Nam"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Tanzania"] <- "Tanzania, United Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "South Korea"] <- "Korea, Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Russia"] <- "Russian Federation"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Brunei"] <- "Brunei Darussalam"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Laos"] <- "Lao People's Democratic Republic"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "East Timor"] <- "Timor-Leste"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Bolivia"] <- "Bolivia, Plurinational State of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Ivory Coast"] <- "Cote d'Ivoire"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Macedonia"] <- "Macedonia, the former Yugoslav Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Moldova"] <- "Moldova, Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Democratic Republic of the Congo"] <- "Congo, the Democratic Republic of the"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Iran"] <- "Iran, Islamic Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Federal States of Micronesia"] <- "Micronesia, Federated States of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Czechia"] <- "Czech Republic"
 
 inva_db_clean <- inva_db_clean[!inva_db_clean$Impacted_sector %in% c("Unspecified"),]
 inva_db_clean <- inva_db_clean[!inva_db_clean$Official_country %in% c("31 countries",
-                                                    "African Countries",
-                                                    "Diverse",
-                                                    "EU27+",
-                                                    "Unspecified"),]
+                                                                      "African Countries",
+                                                                      "Diverse",
+                                                                      "EU27+",
+                                                                      "Unspecified"),]
 
 inva_db_clean <- inva_db_clean[!duplicated(inva_db_clean),]
 
@@ -224,24 +245,6 @@ unique(scs_unq$Species)[!name_match]
 scs_unq_gbif <- 
   scs_unq[scs_unq$Species %in% unique(scs_unq$Species)[name_match],]
 
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "United States of America"] <- "United States"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Venezuela"] <- "Venezuela, Bolivarian Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Vietnam"] <- "Viet Nam"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Tanzania"] <- "Tanzania, United Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "South Korea"] <- "Korea, Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Russia"] <- "Russian Federation"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Brunei"] <- "Brunei Darussalam"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Laos"] <- "Lao People's Democratic Republic"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "East Timor"] <- "Timor-Leste"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Bolivia"] <- "Bolivia, Plurinational State of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Ivory Coast"] <- "Cote d'Ivoire"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Macedonia"] <- "Macedonia, the former Yugoslav Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Moldova"] <- "Moldova, Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Democratic Republic of the Congo"] <- "Congo, the Democratic Republic of the"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Iran"] <- "Iran, Islamic Republic of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Federal States of Micronesia"] <- "Micronesia, Federated States of"
-scs_unq_gbif$Official_country[scs_unq_gbif$Official_country == "Czechia"] <- "Czech Republic"
-
 scs_unq_gbif$iso2 <- 
   rgbif::isocodes$code[match(scs_unq_gbif$Official_country,
                              rgbif::isocodes$name)]
@@ -329,10 +332,10 @@ completeness_df <-
 write.csv(completeness_df, "completeness_df.csv", row.names = FALSE)
 ```
 
-Plot countries with more than 10% data completeness
+Plot countries with more than 1% data completeness
 
 ```{r}
-completeness_df[completeness_df$sp_prop > 0.1,] %>% 
+completeness_df[completeness_df$sp_prop > 0.01,] %>% 
   ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
              y = sp_prop,
              fill = sp_prop)) +
@@ -384,7 +387,7 @@ Plot countries with more than 10% data completeness for each impacted sector
 
 ```{r}
 completeness_sector_df[completeness_sector_df$sector == "Agriculture" &
-                         completeness_sector_df$sp_prop > 0.1,] %>% 
+                         completeness_sector_df$sp_prop > 0.01,] %>% 
   ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
              y = sp_prop,
              fill = sp_prop)) +
@@ -392,7 +395,7 @@ completeness_sector_df[completeness_sector_df$sector == "Agriculture" &
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Environment" &
-                         completeness_sector_df$sp_prop > 0.1,] %>% 
+                         completeness_sector_df$sp_prop > 0.01,] %>% 
   ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
              y = sp_prop,
              fill = sp_prop)) +
@@ -400,7 +403,7 @@ completeness_sector_df[completeness_sector_df$sector == "Environment" &
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Authorities-Stakeholders" &
-                         completeness_sector_df$sp_prop > 0.1,] %>% 
+                         completeness_sector_df$sp_prop > 0.01,] %>% 
   ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
              y = sp_prop,
              fill = sp_prop)) +
@@ -408,7 +411,7 @@ completeness_sector_df[completeness_sector_df$sector == "Authorities-Stakeholder
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Public and Social Welfare" &
-                         completeness_sector_df$sp_prop > 0.1,] %>% 
+                         completeness_sector_df$sp_prop > 0.01,] %>% 
   ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
              y = sp_prop,
              fill = sp_prop)) +
@@ -416,7 +419,7 @@ completeness_sector_df[completeness_sector_df$sector == "Public and Social Welfa
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Health" &
-                         completeness_sector_df$sp_prop > 0.1,] %>% 
+                         completeness_sector_df$sp_prop > 0.01,] %>% 
   ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
              y = sp_prop,
              fill = sp_prop)) +
@@ -424,7 +427,7 @@ completeness_sector_df[completeness_sector_df$sector == "Health" &
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Forestry" &
-                         completeness_sector_df$sp_prop > 0.1,] %>% 
+                         completeness_sector_df$sp_prop > 0.01,] %>% 
   ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
              y = sp_prop,
              fill = sp_prop)) +
@@ -432,7 +435,7 @@ completeness_sector_df[completeness_sector_df$sector == "Forestry" &
   theme_classic()
 
 completeness_sector_df[completeness_sector_df$sector == "Fishery" &
-                         completeness_sector_df$sp_prop > 0.1,] %>% 
+                         completeness_sector_df$sp_prop > 0.01,] %>% 
   ggplot(aes(x = forcats::fct_rev(forcats::fct_reorder(country, sp_prop)),
              y = sp_prop,
              fill = sp_prop)) +
@@ -450,7 +453,8 @@ psce_df <-
     Phylum = inva_db_clean$Phylum,
     Sector  = inva_db_clean$Impacted_sector,
     Environment = inva_db_clean$Environment,
-    Cost = inva_db_clean$Cost_estimate_per_year_2017_USD_PPP)
+    Cost = inva_db_clean$Cost_estimate_per_year_2017_USD_PPP,
+    Country = inva_db_clean$Official_country)
 
 psce_unq <- psce_df[complete.cases(psce_df),]
 
@@ -538,8 +542,6 @@ psce_unq[psce_unq$Environment == "Terrestrial",] %>%
 Log and scale cost data
 
 ```{r}
-set.seed(1)
-
 psce_unq$log_Cost <- log(psce_unq$Cost)
 psce_unq$log_Cost <- psce_unq$log_Cost/max(psce_unq$log_Cost)
 ```
@@ -547,6 +549,8 @@ psce_unq$log_Cost <- psce_unq$log_Cost/max(psce_unq$log_Cost)
 Partition data
 
 ```{r}
+set.seed(1)
+
 part_ind <- 
   caret::createDataPartition(y=psce_unq$log_Cost, 
                              p=0.7, 
@@ -561,12 +565,15 @@ Fit Random Forest model
 ```{r}
 set.seed(1)
 
+train_control <-
+  caret::trainControl(method = 'repeatedcv', 
+                      number = 5, 
+                      repeats = 3)
+
 psce_rf <- 
   caret::train(log_Cost ~ Sector + Group + Environment, 
                method='rf', 
-               trControl= caret::trainControl(method = 'repeatedcv', 
-                                              number = 5, 
-                                              repeats = 3),
+               trControl= train_control,
                metric='RMSE',
                data = psce_train)
 
@@ -650,9 +657,9 @@ inds_cntr <-
 
 Read all in a single table
 
-```{r}
+```{r, eval = FALSE}
 inds_cntr <-
-  pbapply::pblapply(list.files(pattern = "^indicator_", 
+  pbapply::pblapply(list.files("C:/Users/gabri/Desktop/wb_indicators_cntr", pattern = "^indicator_", 
                                full.names = TRUE), 
                     function(fl){
                       
@@ -661,7 +668,7 @@ inds_cntr <-
                     })
 
 dl_index <-
-  list.files(pattern = "^indicator_") %>%
+  list.files("C:/Users/gabri/Desktop/wb_indicators_cntr", pattern = "^indicator_") %>%
   stringr::str_sub(11, -5) %>%
   as.numeric()
 
@@ -672,7 +679,7 @@ saveRDS(inds_cntr, "inds_cntr.rds")
 
 Get only indicators available for all UN member states in InvaCost
 
-```{r}
+```{r, eval = FALSE}
 inva_cntr <- unique(scs_unq_gbif$iso2)
 un_members <- read.csv("un_members.csv")
 un_members$iso2 <- stringr::str_sub(un_members$iso2, 1, 2)
@@ -690,6 +697,129 @@ complete_indicators <-
 write.csv(complete_indicators[-6], 
           "complete_indicators.csv", 
           row.names = FALSE)
+```
+
+Select appropriate predictors
+
+```{r}
+complete_indicators <- 
+  read.csv("complete_indicators.csv")
+
+exclude_ind <- c(1:11, 13:21, 23, 31:64, 66, 67, 69, 71:73, 81:100, 102:105, 107, 108, 110:126, 128:133, 134:137, 138:248, 250:261, 263:274, 276, 278:462, 463, 465:477, 478:493, 495, 496, 498:515, 518, 519, 521, 522, 524:532, 535, 536, 538, 539, 541:605)
+
+clean_indicators <- complete_indicators[-exclude_ind,]
+```
+
+Download selected indicators
+
+```{r}
+inds_clean_list <- 
+  pbapply::pblapply(clean_indicators$indicator_id, 
+                    function(ind){
+                      
+                      this_ind <- 
+                        try(wbstats::wb_data(ind, mrnev = 1), silent = TRUE)
+                      
+                      if(class(this_ind)[1] == "try-error"){
+                        
+                        return(this_ind)
+                        
+                      } else if(ncol(this_ind) == 0){ 
+                        
+                        return(NULL)
+                        
+                      } else {
+                        
+                        return(this_ind)
+                        
+                      }
+                      
+                    })
+
+saveRDS(inds_clean_list, "inds_clean_list.rds")
+```
+
+```{r}
+errors_index <- sapply(inds_clean_list, function(x) "try-error" %in% class(x))
+
+inds_clean_list <- inds_clean_list[!errors_index]
+
+inds_df <-
+  lapply(inds_clean_list, function(ind) ind[,c(1,5)]) %>% 
+  plyr::join_all(., by='iso2c', type='full')
+
+inds_df <- inds_df[complete.cases(inds_df),]
+```
+
+```{r}
+psce_train$iso2 <- 
+  rgbif::isocodes$code[match(psce_train$Country,
+                             rgbif::isocodes$name)]
+
+psce_test$iso2 <- 
+  rgbif::isocodes$code[match(psce_test$Country,
+                             rgbif::isocodes$name)]
+
+psce_train_preds <-
+  dplyr::left_join(psce_train, inds_df, by = c("iso2" = "iso2c"))
+
+psce_test_preds <-
+  dplyr::left_join(psce_test, inds_df, by = c("iso2" = "iso2c"))
+```
+
+```{r}
+psce_boruta_preds <- 
+  Boruta::Boruta(log_Cost ~ .,
+                 psce_train_preds[,-c(1,4,5,8)])
+
+selected_preds <-
+  names(psce_boruta_preds$finalDecision)[psce_boruta_preds$finalDecision == "Confirmed"]
+
+View(clean_indicators[clean_indicators$indicator_id %in% selected_preds,])
+```
+
+```{r}
+psce_train_selected <- 
+  psce_train_preds[c(7, which(names(psce_train_preds) %in% selected_preds))]
+```
+
+Fit Random Forest model
+
+```{r}
+set.seed(1)
+
+train_control <-
+  caret::trainControl(method = 'repeatedcv', 
+                      number = 5, 
+                      repeats = 3, 
+                      search="random",
+                      verbose = TRUE)
+
+psce_rf_preds <- 
+  caret::train(log_Cost ~ ., 
+               method='rf', 
+               trControl= train_control,
+               metric='RMSE',
+               data = psce_train_selected,
+               tuneLength = 15)
+
+saveRDS(psce_rf_preds, "psce_rf_preds.rds")
+```
+
+Cross-validate
+
+```{r}
+psce_rf_preds <- readRDS("psce_rf_preds.rds")
+
+# psce_rf_preds$finalModel
+
+pred_psce_rf_preds <- 
+  predict(psce_rf_preds, 
+          psce_test_preds)
+
+1 - mean((pred_psce_rf_preds - 
+            psce_test_preds$log_Cost)^2)/
+  var(psce_test_preds$log_Cost)
 ```
 
 # Scrape GISD
@@ -743,7 +873,7 @@ gisd_table <-
       data.frame(sp = sp_name, 
                  country = c(split_ar_fixed, split_nr), 
                  status = c(rep("invasive", length(split_ar_fixed)),
-                   rep("native", length(split_nr))))
+                            rep("native", length(split_nr))))
       
     } else { NULL }
     
@@ -757,7 +887,7 @@ See how many of the species in InvaCost filtered have data in GISD
 
 ```{r}
 gisd_table <- read.csv("gisd_table.csv")
-  
+
 sp_inva <- 
   inva_db_clean$Species[!stringr::str_detect(inva_db_clean$Species, "\\.")] %>% 
   unique
