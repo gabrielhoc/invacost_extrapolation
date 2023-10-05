@@ -16,9 +16,9 @@ vignette: >
 
 - Include installation of all packages
 - Find better records of invasive species distribution
-- Adjust RF hyperparameters
-- add time since introduction
-- use taxonomic groups in Seebens 2017?
+- Investigate NAs for Maldives and Namibia
+- Investigate NAs for Phyllum
+- download GBIF records again
 
 # Set up
 
@@ -64,9 +64,13 @@ inva_db_clean <-
   inva_db[inva_db$Method_reliability == "High" & 
             inva_db$Spatial_scale == "Country" &
             inva_db$Implementation == "Observed" &
-            !stringr::str_detect(inva_db$Species, "/") &
-            !stringr::str_detect(inva_db$Official_country, "/") &
-            !stringr::str_detect(inva_db$Impacted_sector, "/"),]
+            !stringr::str_detect(inva_db$Official_country, "/"),]
+
+inva_db_clean$Impacted_sector[stringr::str_detect(inva_db_clean$Impacted_sector, "/")] <- "Mixed"
+inva_db_clean$Phylum[stringr::str_detect(inva_db_clean$Phylum, "/")] <- "Mixed"
+inva_db_clean$Class[stringr::str_detect(inva_db_clean$Class, "/")] <- "Mixed"
+inva_db_clean$Geographic_region[stringr::str_detect(inva_db_clean$Geographic_region, "/")] <- "Mixed"
+inva_db_clean$Environment[stringr::str_detect(inva_db_clean$Environment, "/")] <- "Mixed"
 ```
 
 Fix some typos and remove unspecified countries and impact sectors
@@ -108,6 +112,8 @@ inva_db_clean <- inva_db_clean[!inva_db_clean$Official_country %in% c("31 countr
 inva_db_clean <- inva_db_clean[!duplicated(inva_db_clean),]
 
 dim(inva_db_clean)
+
+write.csv(inva_db_clean, "inva_db_clean.csv", row.names = FALSE)
 ```
 
 It seems the there are a few data points with multiple species, countries and impacted sectors. Let's create a new table with only unique combinations.
@@ -165,7 +171,7 @@ saveRDS(gbif_lookup, "gbif_lookup.rds")
 
 See which names found no match in GBIF
 
-```{r, eval = FALSE}
+```{r}
 gbif_lookup <- readRDS("gbif_lookup.rds")
 
 name_match <- 
@@ -250,6 +256,16 @@ scs_unq_gbif$iso2 <-
                              rgbif::isocodes$name)]
 
 scs_unq_gbif$iso2[scs_unq_gbif$Official_country == "Kosovo"] <- "XK"
+
+scs_unq_gbif$Geographic_region <- 
+  inva_db_clean$Geographic_region[match(scs_unq_gbif$Official_country,
+                                        inva_db_clean$Official_country)]
+
+country_region <-
+  scs_unq_gbif[c(2,4,5)] %>% 
+  unique()
+
+write.csv(country_region, "country_region.csv", row.names = FALSE)
 ```
 
 Get GBIF taxon keys
@@ -451,10 +467,13 @@ Select only phylum, sector, environment and cost
 psce_df <-
   data.frame(
     Phylum = inva_db_clean$Phylum,
+    Class = inva_db_clean$Class,
+    Geographic_region = inva_db_clean$Geographic_region,
     Sector  = inva_db_clean$Impacted_sector,
     Environment = inva_db_clean$Environment,
-    Cost = inva_db_clean$Cost_estimate_per_year_2017_USD_PPP,
-    Country = inva_db_clean$Official_country)
+    Cost = inva_db_clean$Cost_estimate_per_year_2017_USD_exchange_rate,
+    Country = inva_db_clean$Official_country,
+    Type_of_cost = inva_db_clean$Type_of_cost_merged)
 
 psce_unq <- psce_df[complete.cases(psce_df),]
 
@@ -465,9 +484,6 @@ Group Phylla into broader groups
 
 ```{r}
 psce_unq$Phylum %>% unique
-
-psce_unq <- psce_unq[!psce_unq$Phylum %in% c("Diverse", "Unspecified", "Diverse/Unspecified"),]
-psce_unq <- psce_unq[!psce_unq$Environment %in% c("Diverse", "Unspecified", "Semi-Aquatic"),]
 
 psce_unq$Group <- NA
 psce_unq$Group[psce_unq$Phylum == "Chordata"] <- "Vertebrates"
@@ -535,73 +551,8 @@ psce_unq[psce_unq$Environment == "Terrestrial",] %>%
              fill = Group)) +
   geom_boxplot() + 
   theme_classic()
-```
 
-# Fit random forest without country data
-
-Log and scale cost data
-
-```{r}
-psce_unq$log_Cost <- log(psce_unq$Cost)
-psce_unq$log_Cost <- psce_unq$log_Cost/max(psce_unq$log_Cost)
-```
-
-Partition data
-
-```{r}
-set.seed(1)
-
-part_ind <- 
-  caret::createDataPartition(y=psce_unq$log_Cost, 
-                             p=0.7, 
-                             list=FALSE)
-
-psce_train <- psce_unq[part_ind, ]
-psce_test <- psce_unq[-part_ind, ]
-```
-
-Fit Random Forest model
-
-```{r}
-set.seed(1)
-
-train_control <-
-  caret::trainControl(method = 'repeatedcv', 
-                      number = 5, 
-                      repeats = 3)
-
-psce_rf <- 
-  caret::train(log_Cost ~ Sector + Group + Environment, 
-               method='rf', 
-               trControl= train_control,
-               metric='RMSE',
-               data = psce_train)
-
-saveRDS(psce_rf, "psce_rf.rds")
-```
-
-Cross-validate
-
-```{r}
-psce_rf <- readRDS("psce_rf.rds")
-
-# psce_rf$finalModel
-
-pred_psce_rf <- 
-  predict(psce_rf, 
-          psce_test)
-
-1 - mean((pred_psce_rf - psce_test$log_Cost)^2)/var(psce_test$log_Cost)
-```
-
-Check variable importance with Boruta
-
-```{r}
-psce_boruta <- 
-  Boruta::Boruta(log_Cost ~ Sector + Group + Environment,
-                 psce_train)
-
-plot(psce_boruta)
+write.csv(psce_unq, "psce_unq.csv", row.names = FALSE)
 ```
 
 # Get country data from WorldBank
@@ -740,6 +691,8 @@ saveRDS(inds_clean_list, "inds_clean_list.rds")
 ```
 
 ```{r}
+inds_clean_list <- readRDS("inds_clean_list.rds")
+
 errors_index <- sapply(inds_clean_list, function(x) "try-error" %in% class(x))
 
 inds_clean_list <- inds_clean_list[!errors_index]
@@ -748,78 +701,11 @@ inds_df <-
   lapply(inds_clean_list, function(ind) ind[,c(1,5)]) %>% 
   plyr::join_all(., by='iso2c', type='full')
 
-inds_df <- inds_df[complete.cases(inds_df),]
-```
+inds_df <- inds_df[inds_df$iso2c %in% un_members$iso2,]
 
-```{r}
-psce_train$iso2 <- 
-  rgbif::isocodes$code[match(psce_train$Country,
-                             rgbif::isocodes$name)]
+inds_df <- inds_df[!apply(inds_df, 2, function(x) any(is.na(x)))]
 
-psce_test$iso2 <- 
-  rgbif::isocodes$code[match(psce_test$Country,
-                             rgbif::isocodes$name)]
-
-psce_train_preds <-
-  dplyr::left_join(psce_train, inds_df, by = c("iso2" = "iso2c"))
-
-psce_test_preds <-
-  dplyr::left_join(psce_test, inds_df, by = c("iso2" = "iso2c"))
-```
-
-```{r}
-psce_boruta_preds <- 
-  Boruta::Boruta(log_Cost ~ .,
-                 psce_train_preds[,-c(1,4,5,8)])
-
-selected_preds <-
-  names(psce_boruta_preds$finalDecision)[psce_boruta_preds$finalDecision == "Confirmed"]
-
-View(clean_indicators[clean_indicators$indicator_id %in% selected_preds,])
-```
-
-```{r}
-psce_train_selected <- 
-  psce_train_preds[c(7, which(names(psce_train_preds) %in% selected_preds))]
-```
-
-Fit Random Forest model
-
-```{r}
-set.seed(1)
-
-train_control <-
-  caret::trainControl(method = 'repeatedcv', 
-                      number = 5, 
-                      repeats = 3, 
-                      search="random",
-                      verbose = TRUE)
-
-psce_rf_preds <- 
-  caret::train(log_Cost ~ ., 
-               method='rf', 
-               trControl= train_control,
-               metric='RMSE',
-               data = psce_train_selected,
-               tuneLength = 15)
-
-saveRDS(psce_rf_preds, "psce_rf_preds.rds")
-```
-
-Cross-validate
-
-```{r}
-psce_rf_preds <- readRDS("psce_rf_preds.rds")
-
-# psce_rf_preds$finalModel
-
-pred_psce_rf_preds <- 
-  predict(psce_rf_preds, 
-          psce_test_preds)
-
-1 - mean((pred_psce_rf_preds - 
-            psce_test_preds$log_Cost)^2)/
-  var(psce_test_preds$log_Cost)
+write.csv(inds_df, "inds_df.csv", row.names = FALSE)
 ```
 
 # Scrape GISD
