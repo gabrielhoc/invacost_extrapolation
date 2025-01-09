@@ -1,0 +1,1766 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Set up
+
+Install necessary packages
+
+```{r, eval = FALSE}
+install.packages("magrittr")
+install.packages("ggplot2")
+install.packages("invacost")
+install.packages("dplyr")
+install.packages("Boruta")
+install.packages("pbapply")
+install.packages("caret")
+install.packages("randomForest")
+install.packages("stringr")
+install.packages("ISOcodes")
+install.packages("ggiraph")
+install.packages("scales")
+install.packages("viridis")
+install.packages("gridExtra")
+```
+
+Load packages and data
+
+```{r}
+library(magrittr)
+library(ggplot2)
+
+inds_df <- read.csv("inds_df.csv")
+inva_db_exp <- read.csv("inva_db_exp2.csv")
+inva_db_clean <- readRDS("inva_db_clean2.rds")
+inva_db <- invacost::getInvaCostVersion()
+
+inds_df$iso2c[is.na(inds_df$iso2c)] <- "NA" # Namibia gets mistaken for missing data
+inva_db_exp$iso2[is.na(inva_db_exp$iso2)] <- "NA"
+```
+
+# Run Boruta for variable importances
+
+```{r, eval = FALSE}
+inva_boruta_df <-
+  dplyr::left_join(inva_db_exp[-c(1:5,8:14,16,17,20)], 
+                   inds_df[-c(7,13)], 
+                   by = c("iso2" = "iso2c"))
+
+boruta_inva <-
+  Boruta::Boruta(x = inva_boruta_df[-5],
+                 y = inva_db_exp$log_Cost)
+
+saveRDS(boruta_inva, "boruta_inva.rds")
+```
+
+Plot results
+
+```{r}
+boruta_inva <- readRDS("boruta_inva.rds")
+
+colnames(boruta_inva$ImpHistory) <- 
+  c("Environment",
+    "Insularity",
+    "Economic sector",
+    "Taxonomic group",
+    "Years since invasion",
+    "Agricultural area",
+    "Forest area",
+    "Total area",
+    "Human Population",
+    "Fisheries",
+    "Primary production",
+    "GDP",
+    "Regulatory quality",
+    "Life expectancy",
+    "Subregion",
+    "Control Max",
+    "Control Mean",
+    "Control Min")
+
+vars <- boruta_inva$ImpHistory %>% colMeans() %>% sort %>% names
+
+plot(boruta_inva, xaxt = "n", xlab = "")
+
+## Draw the x-axis labels.
+text(x = 1:18,
+     ## Move labels to just below bottom of chart.
+     y = par("usr")[3] - 0.45,
+     ## Use names from the data list.
+     labels = vars,
+     ## Change the clipping region.
+     xpd = NA,
+     ## Rotate the labels by 35 degrees.
+     srt = 35,
+     ## Adjust the labels to almost 100% right-justified.
+     adj = 0.965)
+```
+
+# Fit models
+
+200 bootstraps and cross validation, both with log and raw cost values.
+
+```{r, warning = FALSE, message = FALSE, eval = FALSE}
+all_models <-
+pbapply::pblapply(1:200, function(i){
+  
+  part_ind <- 
+    caret::createDataPartition(y=inva_db_exp$log_Cost, 
+                               p=0.7, 
+                               list=FALSE)
+  
+  inva_train <- inva_db_exp[part_ind, ]
+  inva_test <- inva_db_exp[-part_ind, ]
+  
+  inva_train_preds <-
+    dplyr::left_join(inva_train, inds_df[-c(7,13)], by = c("iso2" = "iso2c"))
+  
+  inva_train_preds <- inva_train_preds[-c(1:5,8:14,16,17,19)]
+  
+  inva_test_preds <-
+    dplyr::left_join(inva_test, inds_df[-c(7,13)], by = c("iso2" = "iso2c"))
+  
+  inva_test_preds <- inva_test_preds[-c(1:5,8:14,16,17,19)]
+  
+  test_data <- inva_test_preds[complete.cases(inva_test_preds),]
+  train_data <- inva_train_preds[complete.cases(inva_train_preds),]
+  
+  nrounds <- 1000
+  
+  train_control <- caret::trainControl(
+    method = "cv",
+    verboseIter = FALSE, # no training log
+    allowParallel = TRUE,
+    number = 7
+  )
+
+  psce_rf_preds <-
+    randomForest::randomForest(log_Cost ~ .,
+                               data = train_data)
+  
+  pred_psce_rf_preds <- 
+    predict(psce_rf_preds, 
+            test_data[-5])
+  
+  R_squared <-
+    1 - mean((pred_psce_rf_preds - 
+                test_data$log_Cost)^2)/
+    var(test_data$log_Cost)
+  
+  R_squared_bt <-
+    1 - mean((exp(pred_psce_rf_preds) - 
+                exp(test_data$log_Cost))^2)/
+    var(exp(test_data$log_Cost))
+  
+  saveRDS(list(model = psce_rf_preds,
+               R_squared = R_squared,
+               R_squared_bt = R_squared_bt),
+          paste0("cost_models/psce_rf_preds",i,".rds"))
+  
+})
+```
+
+Show R-squared variation per number of bootstrap replicates
+
+```{r}
+model_files <- list.files("cost_models", full.names = TRUE)
+
+all_models <-
+  pbapply::pblapply(model_files, readRDS)
+
+all_r_sqrd <- 
+  sapply(all_models, function(x) x$R_squared)
+
+median_r_sqrd <-
+  lapply(2:length(all_r_sqrd), function(n){
+    
+    this_sample <- sample(all_r_sqrd, n)
+    
+    data.frame(
+      median = median(this_sample),
+      lci = quantile(this_sample, 0.025),
+      uci = quantile(this_sample, 0.975))
+    
+  }) %>% 
+  do.call(rbind, .)
+
+plot(2:length(all_r_sqrd),
+     median_r_sqrd$median,
+     type = "l",
+     ylim = c(min(median_r_sqrd$lci),
+              max(median_r_sqrd$uci)),
+     ylab = "R-squared",
+     xlab = "Number of replicates")
+
+points(2:length(all_r_sqrd),
+       median_r_sqrd$lci, type = "l", lty = "dashed")
+
+points(2:length(all_r_sqrd),
+       median_r_sqrd$uci, type = "l", lty = "dashed")
+```
+
+Median, SD and 95% CI for R-squared 
+
+```{r}
+median(all_r_sqrd)
+sd(all_r_sqrd)
+quantile(all_r_sqrd, 0.025)
+quantile(all_r_sqrd, 0.975)
+```
+
+# Make predictions for countries
+
+Load country and species data
+
+```{r}
+earliest_occurrence <- readRDS("earliest_occurrence.rds")
+pred_sp_all <- readRDS("pred_sp_all2.rds")
+
+country_species_small <-
+  earliest_occurrence[earliest_occurrence$sp %in% pred_sp_all$Species,] %>% 
+  unique
+
+country_species_small <-
+  country_species_small[complete.cases(country_species_small),] %>% 
+  unique
+
+country_species_small <- country_species_small[country_species_small$year < 2021,]
+country_species_small <- country_species_small[country_species_small$year > 0,]
+
+country_species_small <- country_species_small[country_species_small$country %in% inds_df$iso2c,]
+```
+
+Join country and species data, for years after earliest introduction record
+
+```{r, warning = FALSE, eval = FALSE}
+all_preds <-
+  pbapply::pbapply(country_species_small, 1, 
+                   FUN = function(r){
+                     
+                     pred_sp <- 
+                       pred_sp_all[pred_sp_all$Species == r[1],] %>% 
+                       unique
+                     
+                     pred_cntr <- inds_df[inds_df$iso2c == r[2],]
+                     
+                     all_preds <-
+                       cbind(pred_sp, pred_cntr, introduction_year = as.numeric(r[3]))
+                     
+                     all_preds_year <-
+                       lapply(X = 1970:2020, FUN = function(year){
+                         
+                         all_preds_this_year <- all_preds[all_preds$introduction_year <= year,]
+                         
+                         if(nrow(all_preds_this_year) == 0) return(NULL)
+                         
+                         all_preds_this_year$Impact_year <- year
+                         
+                         all_preds_this_year$years_since_invasion <- 
+                           year - all_preds_this_year$introduction_year
+                         
+                         all_preds_this_year
+                         
+                       }) %>% 
+                       do.call(rbind, .)
+                     
+                   }) %>% 
+  do.call(rbind, .)
+```
+
+Make predictions per country/species
+
+```{r, eval = FALSE}
+costs_per_country <-
+  pbapply::pblapply(X = 1:length(all_models), 
+                    FUN = function(i){
+                      
+                      model <- all_models[[i]]
+                      
+                      pred_cost <-
+                        predict(model$model, all_preds)
+                      
+                      cost_estimate <-
+                        data.frame(all_preds,
+                                   log_cost = pred_cost)
+                      
+                      saveRDS(cost_estimate, paste0("model_preds/model_pred_", i, ".rds"))
+                      
+                      cost_estimate
+                      
+                    })
+
+gc()
+```
+
+Join all predictions
+
+```{r, eval = FALSE}
+all_model_preds <- list.files("model_preds/", full.names = TRUE)[1:200]
+
+info_cols <- readRDS(all_model_preds[[1]])[c(1:6, 17:21)]
+
+costs_per_country <-
+  pbapply::pblapply(all_model_preds, function(x){
+    
+    name <- 
+      stringr::str_sub(x, 32, -5) %>% 
+      paste0("cost_", .)
+    
+    preds <-
+      readRDS(x)
+    
+    out <- data.frame(exp(preds$log_cost))
+    
+    names(out) <- name
+    
+    out
+    
+  }) %>% 
+  do.call(cbind, .) %>%
+  cbind(info_cols, .)
+```
+
+```{r}
+rm(all_models)
+gc
+```
+
+Assign m49 regions to countries
+
+```{r}
+costs_per_country <- read.csv("costs_per_country2.csv")
+
+names(costs_per_country)[names(costs_per_country) == "iso2c"] <- "country"
+
+m49 <- read.csv("m49_full.csv")
+
+m49$iso2 <- 
+  ISOcodes::ISO_3166_1$Alpha_2[match(m49$iso_alpha3_code, 
+                                     ISOcodes::ISO_3166_1$Alpha_3)]
+
+costs_per_country_region <- costs_per_country
+
+costs_per_country_region$region <- 
+  m49$region_name[match(costs_per_country_region$country, 
+                        m49$iso2)]
+
+costs_per_country_region$region[costs_per_country_region$region == "Americas"] <- 
+  "North America"
+
+costs_per_country_region$region[costs_per_country_region$country %in% 
+                                  c("AR", "BO", "BV", "BR", "CL", 
+                                    "CO", "EC", "FK", "GF", "GY",
+                                    "PY", "PE", "GS", "SR", "UY", "VE")] <- "South America"
+```
+
+Format table for the app
+
+```{r}
+sum_costs_per_country <-
+  costs_per_country %>% 
+  dplyr::select(-c(1,4,7,8,9,11)) %>% 
+  dplyr::group_by(Group, Environment, Impacted_sector, Impact_year, country) %>% 
+  dplyr::summarise(across(everything(), sum))
+
+median_costs <-
+  sum_costs_per_country[6:ncol(sum_costs_per_country)] %>% 
+  apply(., 1, median)
+
+costs_per_country_app <-
+  data.frame(sum_costs_per_country[1:5], 
+             Cost = median_costs)
+
+write.csv(costs_per_country_app, "costs_per_country_app2.csv", row.names = FALSE)
+```
+
+# Summaries of costs
+
+Cost breakdown by taxonomic group, economic sector and region
+
+```{r}
+costs_breakdown <-
+  costs_per_country_region %>% 
+  dplyr::select(-c(1,3,4,6,7,8,9,10,11)) %>% 
+  dplyr::group_by(Group, Impacted_sector, region) %>% 
+  dplyr::summarise(across(everything(), sum))
+
+median_costs_breakdown <-
+  costs_breakdown[4:ncol(costs_breakdown)] %>% 
+  apply(., 1, median)
+
+sd_costs_breakdown <-
+  costs_breakdown[4:ncol(costs_breakdown)] %>% 
+  apply(., 1, sd)
+
+costs_breakdown_df <-
+  data.frame(costs_breakdown[1:3], 
+             Cost = median_costs_breakdown,
+             sd = sd_costs_breakdown)
+
+write.csv(costs_breakdown_df, "costs_breakdown_df.csv", row.names = FALSE)
+```
+
+Global Costs per year
+
+```{r}
+global_costs_year <-
+  sum_costs_per_country %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+global_year_median <-
+  global_costs_year[-1] %>% 
+  apply(., 2, median)
+
+global_year_max <-
+  global_costs_year[-1] %>% 
+  apply(., 2, max)
+
+global_year_total <-
+  global_costs_year[-1] %>% 
+  apply(., 2, sum)
+
+median_global_year_median <-
+  lapply(2:length(global_year_median), function(n){
+    
+    this_sample <- sample(global_year_median, n)
+    
+    data.frame(
+      median = median(this_sample),
+      lci = quantile(this_sample, 0.025),
+      uci = quantile(this_sample, 0.975))
+    
+  }) %>% 
+  do.call(rbind, .)
+
+median(global_year_median)
+sd(global_year_median)
+quantile(global_year_median, 0.025)
+quantile(global_year_median, 0.975)
+
+global_cost_per_year <-
+  global_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_global_cost_per_year <-
+  global_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_global_cost_per_year <-
+  global_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_global_cost_per_year <-
+  global_costs_year[-1] %>% 
+  apply(., 1, sd)
+```
+
+Cost variation per bootstrap replicates
+
+```{r}
+costs_per_country_sp <- 
+  costs_per_country %>% 
+  dplyr::group_by(Species, country) %>% 
+  dplyr::summarise(across(10:209, sum))
+
+costs_sp <-
+  costs_per_country_sp[-c(1:2)] %>% 
+  apply(., 1, median) %>% 
+  data.frame(costs_per_country_sp[1:2], Cost = .)
+
+saveRDS(costs_sp, "costs_sp2.rds")
+
+plot(2:length(global_year_median),
+     median_global_year_median$median,
+     type = "l",
+     ylim = c(min(median_global_year_median$lci),
+              max(median_global_year_median$uci)))
+points(2:length(global_year_median),
+       median_global_year_median$lci, type = "l", lty = "dashed")
+points(2:length(global_year_median),
+       median_global_year_median$uci, type = "l", lty = "dashed")
+```
+
+Costs per invasion
+
+```{r}
+costs_per_invasion <-   
+  costs_per_country %>%    
+  dplyr::select(-c(2:4, 7:11)) %>%   
+  dplyr::group_by(Species, country, Group) %>% 
+  dplyr::summarise(across(everything(), sum))
+
+n_invasion <- 
+  table(costs_per_invasion$Group) %>% 
+  as.data.frame
+
+sum_invasion <-   
+  costs_per_invasion[-c(1:2)] %>%  
+  dplyr::group_by(Group) %>% 
+  dplyr::summarise(across(everything(), sum)) %>% 
+  {apply(.[-1], 1, median)}
+
+median_invasion <-     
+  costs_per_invasion[-c(1:2)] %>%   
+  dplyr::group_by(Group) %>% 
+  dplyr::summarise(across(everything(), median)) %>% 
+  {apply(.[-1], 1, median)}
+
+sd_invasion <-   
+  costs_per_invasion[-c(1:2)] %>%  
+  dplyr::group_by(Group) %>% 
+  dplyr::summarise(across(everything(), sd)) %>% 
+  {apply(.[-1], 1, median)}
+
+mean_invasion <-
+  sum_invasion/n_invasion[2] %>% 
+  unlist
+
+summaries_invasion <-
+  data.frame(n = n_invasion,
+             total = sum_invasion,
+             mean = mean_invasion,
+             median = median_invasion,
+             sd = sd_invasion)
+```
+
+Costs per taxonomic group
+
+```{r}
+costs_per_species <-   
+  costs_per_country %>%    
+  dplyr::select(-c(2:4, 6:11)) %>%   
+  dplyr::group_by(Species, Group) %>% 
+  dplyr::summarise(across(everything(), sum))
+
+n_group <- 
+  table(costs_per_species$Group) %>% 
+  as.data.frame
+
+sum_group <-   
+  costs_per_species[-c(1)] %>%  
+  dplyr::group_by(Group) %>% 
+  dplyr::summarise(across(everything(), sum)) %>% 
+  {apply(.[-1], 1, median)}
+
+median_group <-     
+  costs_per_species[-c(1)] %>%   
+  dplyr::group_by(Group) %>% 
+  dplyr::summarise(across(everything(), median)) %>% 
+  {apply(.[-1], 1, median)}
+
+sd_group <-   
+  costs_per_species[-c(1)] %>%  
+  dplyr::group_by(Group) %>% 
+  dplyr::summarise(across(everything(), sd)) %>% 
+  {apply(.[-1], 1, median)}
+
+mean_group <-
+  sum_group/n_group[2] %>% 
+  unlist
+
+summaries_group <-
+  data.frame(n = n_group,
+             total = sum_group,
+             mean = mean_group,
+             median = median_group,
+             sd = sd_group)
+```
+
+Costs per sector
+
+```{r, eval = FALSE}
+costs_per_species <-   
+  costs_per_country %>%    
+  dplyr::select(-c(3:4, 5:11)) %>%   
+  dplyr::group_by(Species, Impacted_sector) %>% 
+  dplyr::summarise(across(everything(), sum))
+
+costs_per_country2 <-   
+  costs_per_country %>%    
+  dplyr::select(-c(1, 3:4, 5, 7:11)) %>%   
+  dplyr::group_by(country, Impacted_sector) %>% 
+  dplyr::summarise(across(everything(), sum))
+
+n_species_sector <- 
+  table(costs_per_species$Impacted_sector) %>% 
+  as.data.frame
+
+n_countries_sector <- 
+  table(costs_per_country2$Impacted_sector) %>% 
+  as.data.frame
+
+sum_sector <-   
+  costs_per_country %>%    
+  dplyr::select(-c(1, 3:11)) %>%   
+  dplyr::group_by(Impacted_sector) %>% 
+  dplyr::summarise(across(everything(), sum)) %>% 
+  {apply(.[-1], 1, median)}
+
+median_sector <-   
+  costs_per_country %>%    
+  dplyr::select(-c(1, 3:11)) %>%   
+  dplyr::group_by(Impacted_sector) %>% 
+  dplyr::summarise(across(everything(), median)) %>% 
+  {apply(.[-1], 1, median)}
+
+sd_sector <-   
+  costs_per_country %>%    
+  dplyr::select(-c(1, 3:11)) %>%   
+  dplyr::group_by(Impacted_sector) %>% 
+  dplyr::summarise(across(everything(), sd)) %>% 
+  {apply(.[-1], 1, median)}
+
+mean_sector <-
+  costs_per_country %>%    
+  dplyr::select(-c(1, 3:11)) %>%   
+  dplyr::group_by(Impacted_sector) %>% 
+  dplyr::summarise(across(everything(), mean)) %>% 
+  {apply(.[-1], 1, median)}
+
+summaries_sector <-
+  data.frame(n_species = n_species_sector,
+             n_countries = n_countries_sector$Freq,
+             total = sum_sector,
+             mean = mean_sector,
+             median = median_sector,
+             sd = sd_sector)
+```
+
+Cost increases
+
+```{r}
+raw_costs <-
+  inva_db_exp[,c(19,12)] %>% 
+  dplyr::group_by(iso2) %>% 
+  dplyr::summarise(Raw_Cost = sum(Cost_estimate_per_year_2017_USD_exchange_rate,
+                                  na.rm = TRUE))
+
+raw_costs <- raw_costs[complete.cases(raw_costs),]
+
+country_estimates <- 
+  costs_per_country[-c(1:5, 7:11)] %>% 
+  dplyr::group_by(country) %>% 
+  dplyr::summarise(Cost = dplyr::across(everything(), sum)) 
+
+median_estimates <-
+  {apply(country_estimates[-1], 1, median)}
+
+country_estimates <- 
+  data.frame(country = country_estimates$country,
+             Cost = median_estimates) %>% 
+  dplyr::left_join(.,
+                   raw_costs,
+                   by = c("country" = "iso2"))
+
+country_estimates <- country_estimates[complete.cases(country_estimates),]
+
+country_estimates$prop <- 
+  country_estimates$Cost/
+  country_estimates$Raw_Cost
+```
+
+```{r}
+country_estimates$region <- 
+  costs_per_country_region$region[match(country_estimates$country,
+                                        costs_per_country_region$country)]
+
+avg_inc_region <-
+  country_estimates %>% 
+  dplyr::group_by(region) %>% 
+  dplyr::summarise(avg_inc = median(prop))
+
+ggplot2::ggplot(avg_inc_region, 
+                aes(x = reorder(region, -avg_inc),
+                    y = avg_inc,
+                    fill = avg_inc)) +
+  geom_col() +
+  theme_classic() + 
+  theme(text = element_text(size = 30),
+        axis.text.x = element_text(angle = 45, hjust=1)) +
+  scale_fill_viridis_c(trans = "log10", option = "turbo") +
+  xlab("Continent")+
+  ylab("Average Proportional Increase") +
+  theme(legend.position = "none")
+```
+
+# Maps
+
+```{r}
+costs_per_country_app <- read.csv("costs_per_country_app2.csv")
+
+costs_per_country_app$country[is.na(costs_per_country_app$country)] <- "NA"
+
+country_total_costs <-
+  costs_per_country_app %>% 
+  dplyr::group_by(country, Impact_year) %>% 
+  dplyr::summarise(Cost = sum(Cost))
+
+country_total_costs <-
+  country_total_costs %>% 
+  dplyr::group_by(country) %>% 
+  dplyr::summarise(Cost = median(Cost))
+
+country_total_costs$gdp <- 
+  inds_df$GDP..current.US..[match(country_total_costs$country, 
+                                  inds_df$iso2c)]
+
+country_total_costs$area <- 
+  inds_df$AG.LND.TOTL.K2[match(country_total_costs$country, 
+                               inds_df$iso2c)]
+
+country_total_costs$Cost_gdp <- 
+  country_total_costs$Cost/
+  country_total_costs$gdp
+
+resid_cost <-
+  lm(log(Cost) ~ log(gdp), country_total_costs)
+
+country_total_costs$residuals <-
+  resid_cost$residuals
+
+country_total_costs$Country <-
+  ISOcodes::ISO_3166_1$Name[match(country_total_costs$country,
+                                  ISOcodes::ISO_3166_1$Alpha_2)]
+
+country_total_costs <-
+  country_total_costs[c(6,1:5)]
+
+names(country_total_costs) <- 
+  c("Country", "iso2", "Total_cost", "GDP", "Cost/GDP", "Residuals Cost~GDP")
+
+write.csv(country_total_costs, "country_total_costs2.csv", row.names = FALSE)
+```
+
+```{r}
+country_total_costs <- read.csv("country_total_costs2.csv")
+
+country_total_costs$iso2[is.na(country_total_costs$iso2)] <- "NA"
+
+names(country_total_costs) <- 
+  c("Country", "iso2", "Total_cost", "GDP", "Cost/GDP", "Residuals Cost~GDP")
+```
+
+```{r}
+world_data <- readRDS("world_data.rds")
+
+worldMaps <- function(df, world_data){
+  
+  # Function for setting the aesthetics of the plot
+  my_theme <- function () {
+    theme_bw() + theme(axis.title = element_blank(),
+                       axis.text = element_blank(),
+                       axis.ticks = element_blank(),
+                       panel.grid.major = element_blank(),
+                       panel.grid.minor = element_blank(),
+                       panel.background = element_blank(),
+                       legend.position = "bottom",
+                       panel.border = element_blank(),
+                       strip.background = element_rect(fill = 'white', colour = 'white'),
+                       plot.margin = margin(t = 0,  # Top margin
+                                            r = 0,  # Right margin
+                                            b = 0,  # Bottom margin
+                                            l = 0))
+  }
+  
+  # Select only the data that the user has selected to view
+  
+  plotdf <- df
+  
+  plotdf$Total_cost <- plotdf$Total_cost/10^9
+  
+  # Add the data the user wants to see to the geographical world data
+  world_data['Total_cost'] <- plotdf$Total_cost[match(world_data$iso2, plotdf$iso2)]
+  
+  # Specify the plot for the world map
+  
+  g1 <- ggplot() + 
+    ggiraph::geom_polygon_interactive(data = subset(world_data, lat >= -60 & lat <= 90),
+                                      color = 'gray70',
+                                      aes(x = long, 
+                                          y = lat, 
+                                          fill = Total_cost, 
+                                          group = group, 
+                                          tooltip = sprintf("%s<br/>%s", iso2, Total_cost),
+                                          data_id = iso2)) + 
+    scale_fill_viridis_c(trans = "log10", option = "turbo", labels = scales::label_comma(), limits = c(0.007, 32)) + 
+    labs(fill = "Billions of USD", color = "Billions of USD", title = NULL, x = NULL, y = NULL) + 
+    coord_fixed() +
+    my_theme() +
+    theme(text = element_text(size = 20),
+          legend.key.size = unit(1, "cm"),
+          legend.text = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+  return(g1)
+}
+
+map_gdp <-
+  worldMaps(country_total_costs, world_data)
+```
+
+```{r}
+country_total_costs$`Cost/GDP` <- country_total_costs$`Cost/GDP`*100
+
+worldMaps <- function(df, world_data){
+  
+  # Function for setting the aesthetics of the plot
+  my_theme <- function () {
+    theme_bw() + theme(axis.title = element_blank(),
+                       axis.text = element_blank(),
+                       axis.ticks = element_blank(),
+                       panel.grid.major = element_blank(),
+                       panel.grid.minor = element_blank(),
+                       panel.background = element_blank(),
+                       legend.position = "bottom",
+                       panel.border = element_blank(),
+                       strip.background = element_rect(fill = 'white', colour = 'white'),
+                       plot.margin = margin(t = 0,  # Top margin
+                                            r = 0,  # Right margin
+                                            b = 0,  # Bottom margin
+                                            l = 0))
+  }
+  
+  # Select only the data that the user has selected to view
+  
+  plotdf <- df
+  
+  plotdf$`Cost/GDP` <- plotdf$`Cost/GDP`
+  
+  # Add the data the user wants to see to the geographical world data
+  world_data['Cost/GDP'] <- plotdf$`Cost/GDP`[match(world_data$iso2, plotdf$iso2)]
+  
+  # Specify the plot for the world map
+  
+  g1 <- ggplot() + 
+    ggiraph::geom_polygon_interactive(data = subset(world_data, lat >= -60 & lat <= 90),
+                                      color = 'gray70',
+                                      aes(x = long, 
+                                          y = lat, 
+                                          fill = `Cost/GDP`, 
+                                          group = group, 
+                                          tooltip = sprintf("%s<br/>%s", iso2, `Cost/GDP`),
+                                          data_id = iso2)) + 
+    scale_fill_viridis_c(trans = "log10", option = "turbo", labels = scales::label_comma(), limits = c(0.001, 18)) + 
+    labs(fill = "Percentage of GDP", color = "Percentage of GDP", title = NULL, x = NULL, y = NULL) + 
+    coord_fixed() +
+    my_theme() +
+    theme(text = element_text(size = 20),
+          legend.key.size = unit(1, "cm"),
+          legend.text = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+  return(g1)
+}
+
+map_gdp_relative <-
+  worldMaps(country_total_costs, world_data)
+```
+
+```{r}
+worldMaps <- function(df, world_data){
+  
+  # Function for setting the aesthetics of the plot
+  my_theme <- function () {
+    theme_bw() + theme(axis.title = element_blank(),
+                       axis.text = element_blank(),
+                       axis.ticks = element_blank(),
+                       panel.grid.major = element_blank(),
+                       panel.grid.minor = element_blank(),
+                       panel.background = element_blank(),
+                       legend.position = "bottom",
+                       panel.border = element_blank(),
+                       strip.background = element_rect(fill = 'white', colour = 'white'),
+                       plot.margin = margin(t = 0,  # Top margin
+                                            r = 0,  # Right margin
+                                            b = 0,  # Bottom margin
+                                            l = 0))
+  }
+  
+  # Select only the data that the user has selected to view
+  
+  plotdf <- df
+  
+  plotdf$prop <- plotdf$prop
+  
+  # Add the data the user wants to see to the geographical world data
+  world_data['prop'] <- plotdf$prop[match(world_data$iso2, plotdf$country)]
+  
+  # Specify the plot for the world map
+  g1 <- ggplot() + 
+    ggiraph::geom_polygon_interactive(data = subset(world_data, lat >= -60 & lat <= 90),
+                                      color = 'gray70',
+                                      aes(x = long, 
+                                          y = lat, 
+                                          fill = prop, 
+                                          group = group, 
+                                          tooltip = sprintf("%s<br/>%s", iso2, prop),
+                                          data_id = iso2)) + 
+    scale_fill_viridis_c(trans = "log10", option = "turbo", labels = scales::label_comma(), limits = c(15, 101016)) + 
+    labs(fill = "Proportional Cost Increase", color = "Proportional Cost Increase", title = NULL, x = NULL, y = NULL) + 
+    coord_fixed() +
+    my_theme() +
+    theme(text = element_text(size = 20),
+          legend.key.size = unit(1, "cm"),
+          legend.text = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+  return(g1)
+}
+
+map_increases <-
+  worldMaps(country_estimates, world_data)
+```
+
+# Time series plots
+
+Global costs time series
+
+```{r}
+global_costs_ts <-
+  data.frame(Year = global_costs_year$Impact_year,
+             Cost = global_cost_per_year/10^9,
+             lci = lci_global_cost_per_year/10^9,
+             uci = uci_global_cost_per_year/10^9,
+             sd = sd_global_cost_per_year/10^9)
+
+global_ts_plot <-
+  ggplot(global_costs_ts, aes(x=Year,y=Cost))+
+  geom_line(size = 2, color = "dark blue") +
+  # geom_point(size = 4, color = "dark blue") +
+  geom_line(aes(y = lci), size = 2, color = "#00AFBB",linetype="dashed") +
+  geom_line(aes(y = uci), size = 2, color = "#00AFBB",linetype="dashed") +
+  theme_bw() + 
+  #ggtitle("Global Economic Costs of Invasive Species") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 20),
+        axis.text.y = element_text(size = 20),  
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20)) +
+  xlab("Year") + ylab("Billions of USD") +
+  theme(text = element_text(size = 30))
+```
+
+```{r}
+total_costs <-
+  global_costs_year[-1] %>% 
+  apply(., 2, sum)
+
+median_total_costs <-
+  lapply(2:length(total_costs), function(n){
+    
+    this_sample <- sample(total_costs, n)
+    
+    data.frame(
+      median = median(this_sample),
+      lci = quantile(this_sample, 0.025),
+      uci = quantile(this_sample, 0.975))
+    
+  }) %>% 
+  do.call(rbind, .)
+
+plot(2:length(total_costs),
+     median_total_costs$median,
+     type = "l",
+     ylim = c(min(median_total_costs$lci),
+              max(median_total_costs$uci)))
+points(2:length(total_costs),
+       median_total_costs$lci, type = "l", lty = "dashed")
+points(2:length(total_costs),
+       median_total_costs$uci, type = "l", lty = "dashed")
+```
+
+```{r, eval = FALSE}
+ggplot2::ggplot(costs_per_country[costs_per_country$year == 2020,], 
+                ggplot2::aes(x = Group, 
+                             fill = Group)) +
+  ggplot2::geom_bar() +
+  ggplot2::theme_classic() +
+  ggplot2::ylab("Records") +
+  ggplot2::theme(text = ggplot2::element_text(size=20))
+
+ggplot2::ggplot(costs_per_country[costs_per_country$year == 2020,], 
+                ggplot2::aes(x = Group, 
+                             y = log_cost,
+                             fill = Group)) +
+  ggplot2::geom_col() +
+  ggplot2::theme_classic() +
+  ggplot2::theme(text = ggplot2::element_text(size=20)) +
+  ggplot2::ylab("Cost (USD/year)")
+
+ggplot2::ggplot(costs_per_country[costs_per_country$year == 2020,], 
+                ggplot2::aes(x = Impacted_sector, 
+                             y = Cost,
+                             fill = Impacted_sector)) +
+  ggplot2::geom_col() +
+  ggplot2::theme_classic() +
+  ggplot2::theme(text = ggplot2::element_text(size=20)) +
+  ggplot2::ylab("Cost (USD/year)")
+```
+
+Time series by regions
+
+```{r}
+oc_countries <- costs_per_country_region$country[costs_per_country_region$region == "Oceania"]
+eu_countries <- costs_per_country_region$country[costs_per_country_region$region == "Europe"]
+na_countries <- costs_per_country_region$country[costs_per_country_region$region == "North America"]
+sa_countries <- costs_per_country_region$country[costs_per_country_region$region == "South America"]
+af_countries <- costs_per_country_region$country[costs_per_country_region$region == "Africa"]
+as_countries <- costs_per_country_region$country[costs_per_country_region$region == "Asia"]
+
+oc_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$country %in% oc_countries,] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+eu_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$country %in% eu_countries,] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+na_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$country %in% na_countries,] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+sa_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$country %in% sa_countries,] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+af_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$country %in% af_countries,] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+as_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$country %in% as_countries,] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+```
+
+Oceania
+
+```{r}
+oc_cost_per_year <-
+  oc_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_oc_cost_per_year <-
+  oc_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_oc_cost_per_year <-
+  oc_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_oc_cost_per_year <-
+  oc_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+oc_costs_ts <-
+  data.frame(Year = oc_costs_year$Impact_year,
+             Cost = oc_cost_per_year/10^9,
+             lci = lci_oc_cost_per_year/10^9,
+             uci = uci_oc_cost_per_year/10^9,
+             sd = sd_oc_cost_per_year/10^9)
+```
+
+Europe
+
+```{r}
+eu_cost_per_year <-
+  eu_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_eu_cost_per_year <-
+  eu_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_eu_cost_per_year <-
+  eu_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_eu_cost_per_year <-
+  eu_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+eu_costs_ts <-
+  data.frame(Year = eu_costs_year$Impact_year,
+             Cost = eu_cost_per_year/10^9,
+             lci = lci_eu_cost_per_year/10^9,
+             uci = uci_eu_cost_per_year/10^9,
+             sd = sd_eu_cost_per_year/10^9)
+```
+
+North America
+
+```{r}
+na_cost_per_year <-
+  na_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_na_cost_per_year <-
+  na_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_na_cost_per_year <-
+  na_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_na_cost_per_year <-
+  na_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+na_costs_ts <-
+  data.frame(Year = na_costs_year$Impact_year,
+             Cost = na_cost_per_year/10^9,
+             lci = lci_na_cost_per_year/10^9,
+             uci = uci_na_cost_per_year/10^9,
+             sd = sd_na_cost_per_year/10^9)
+```
+
+South America
+
+```{r}
+sa_cost_per_year <-
+  sa_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_sa_cost_per_year <-
+  sa_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_sa_cost_per_year <-
+  sa_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_sa_cost_per_year <-
+  sa_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+sa_costs_ts <-
+  data.frame(Year = sa_costs_year$Impact_year,
+             Cost = sa_cost_per_year/10^9,
+             lci = lci_sa_cost_per_year/10^9,
+             uci = uci_sa_cost_per_year/10^9,
+             sd = sd_sa_cost_per_year/10^9)
+```
+
+Africa
+
+```{r}
+af_cost_per_year <-
+  af_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_af_cost_per_year <-
+  af_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_af_cost_per_year <-
+  af_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_af_cost_per_year <-
+  af_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+af_costs_ts <-
+  data.frame(Year = af_costs_year$Impact_year,
+             Cost = af_cost_per_year/10^9,
+             lci = lci_af_cost_per_year/10^9,
+             uci = uci_af_cost_per_year/10^9,
+             sd = sd_af_cost_per_year/10^9)
+```
+
+Asia
+
+```{r}
+as_cost_per_year <-
+  as_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_as_cost_per_year <-
+  as_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_as_cost_per_year <-
+  as_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_as_cost_per_year <-
+  as_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+as_costs_ts <-
+  data.frame(Year = as_costs_year$Impact_year,
+             Cost = as_cost_per_year/10^9,
+             lci = lci_as_cost_per_year/10^9,
+             uci = uci_as_cost_per_year/10^9,
+             sd = sd_as_cost_per_year/10^9)
+```
+
+All regions
+
+```{r}
+regions_ts <-
+  rbind(
+    data.frame(oc_costs_ts, region = "Oceania"),
+    data.frame(eu_costs_ts, region = "Europe"),
+    data.frame(na_costs_ts, region = "North America"),
+    data.frame(sa_costs_ts, region = "South America"),
+    data.frame(af_costs_ts, region = "Africa"),
+    data.frame(as_costs_ts, region = "Asia"))
+
+regions_ts_plot <-
+  ggplot(regions_ts, aes(x=Year, y=Cost, color = region))+
+  geom_line(size = 2) +
+  # geom_point(size = 4, color = "dark blue") +
+  # geom_line(aes(y = lci), size = 2,linetype="dashed") +
+  # geom_line(aes(y = uci), size = 2,linetype="dashed") +
+  theme_bw() + 
+  #ggtitle("as Economic Costs of Invasive Species") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 20),
+        axis.text.y = element_text(size = 20),  
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 12)) +
+  xlab("Year") + ylab("Billions of USD") +
+  viridis::scale_color_viridis(discrete = TRUE, option = "turbo") +
+  theme(text = element_text(size = 30))
+```
+
+Time series by sector
+
+```{r}
+au_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Impacted_sector == "Authorities-Stakeholders",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+en_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Impacted_sector == "Environment",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+fi_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Impacted_sector == "Fishery",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+he_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Impacted_sector == "Health",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+pu_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Impacted_sector == "Public and Social Welfare",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+ag_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Impacted_sector == "Agriculture",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+fo_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Impacted_sector == "Forestry",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+```
+
+Authorities-Stakeholders
+
+```{r}
+au_cost_per_year <-
+  au_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_au_cost_per_year <-
+  au_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_au_cost_per_year <-
+  au_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_au_cost_per_year <-
+  au_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+au_costs_ts <-
+  data.frame(Year = au_costs_year$Impact_year,
+             Cost = au_cost_per_year/10^9,
+             lci = lci_au_cost_per_year/10^9,
+             uci = uci_au_cost_per_year/10^9,
+             sd = sd_au_cost_per_year/10^9)
+```
+
+Environment
+
+```{r}
+en_cost_per_year <-
+  en_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_en_cost_per_year <-
+  en_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_en_cost_per_year <-
+  en_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_en_cost_per_year <-
+  en_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+en_costs_ts <-
+  data.frame(Year = en_costs_year$Impact_year,
+             Cost = en_cost_per_year/10^9,
+             lci = lci_en_cost_per_year/10^9,
+             uci = uci_en_cost_per_year/10^9,
+             sd = sd_en_cost_per_year/10^9)
+```
+
+Fishery
+
+```{r}
+fi_cost_per_year <-
+  fi_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_fi_cost_per_year <-
+  fi_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_fi_cost_per_year <-
+  fi_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_fi_cost_per_year <-
+  fi_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+fi_costs_ts <-
+  data.frame(Year = fi_costs_year$Impact_year,
+             Cost = fi_cost_per_year/10^9,
+             lci = lci_fi_cost_per_year/10^9,
+             uci = uci_fi_cost_per_year/10^9,
+             sd = sd_fi_cost_per_year/10^9)
+```
+
+Health
+
+```{r}
+he_cost_per_year <-
+  he_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_he_cost_per_year <-
+  he_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_he_cost_per_year <-
+  he_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_he_cost_per_year <-
+  he_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+he_costs_ts <-
+  data.frame(Year = he_costs_year$Impact_year,
+             Cost = he_cost_per_year/10^9,
+             lci = lci_he_cost_per_year/10^9,
+             uci = uci_he_cost_per_year/10^9,
+             sd = sd_he_cost_per_year/10^9)
+```
+
+Public and Social Welfare
+
+```{r}
+pu_cost_per_year <-
+  pu_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_pu_cost_per_year <-
+  pu_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_pu_cost_per_year <-
+  pu_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_pu_cost_per_year <-
+  pu_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+pu_costs_ts <-
+  data.frame(Year = pu_costs_year$Impact_year,
+             Cost = pu_cost_per_year/10^9,
+             lci = lci_pu_cost_per_year/10^9,
+             uci = uci_pu_cost_per_year/10^9,
+             sd = sd_pu_cost_per_year/10^9)
+```
+
+Agriculture
+
+```{r}
+ag_cost_per_year <-
+  ag_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_ag_cost_per_year <-
+  ag_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_ag_cost_per_year <-
+  ag_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_ag_cost_per_year <-
+  ag_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+ag_costs_ts <-
+  data.frame(Year = ag_costs_year$Impact_year,
+             Cost = ag_cost_per_year/10^9,
+             lci = lci_ag_cost_per_year/10^9,
+             uci = uci_ag_cost_per_year/10^9,
+             sd = sd_ag_cost_per_year/10^9)
+```
+
+Forestry
+
+```{r}
+fo_cost_per_year <-
+  fo_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_fo_cost_per_year <-
+  fo_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_fo_cost_per_year <-
+  fo_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_fo_cost_per_year <-
+  fo_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+fo_costs_ts <-
+  data.frame(Year = fo_costs_year$Impact_year,
+             Cost = fo_cost_per_year/10^9,
+             lci = lci_fo_cost_per_year/10^9,
+             uci = uci_fo_cost_per_year/10^9,
+             sd = sd_fo_cost_per_year/10^9)
+```
+
+All sectors
+
+```{r}
+sectors_ts <-
+  rbind(
+    data.frame(au_costs_ts, sector = "Authorities-Stakeholders"),
+    data.frame(en_costs_ts, sector = "Environment"),
+    data.frame(fi_costs_ts, sector = "Fishery"),
+    data.frame(he_costs_ts, sector = "Health"),
+    data.frame(pu_costs_ts, sector = "Public and Social Welfare"),
+    data.frame(ag_costs_ts, sector = "Agriculture"),
+    data.frame(fo_costs_ts, sector = "Forestry"))
+
+sectors_ts_plot <-
+  ggplot(sectors_ts, aes(x=Year, y=Cost, color = sector))+
+  geom_line(size = 2) +
+  # geom_point(size = 4, color = "dark blue") +
+  # geom_line(aes(y = lci), size = 2,linetype="dashed") +
+  # geom_line(aes(y = uci), size = 2,linetype="dashed") +
+  theme_bw() + 
+  #ggtitle("as Economic Costs of Invasive Species") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 20),
+        axis.text.y = element_text(size = 20),  
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 12)) +
+  xlab("Year") + ylab("Billions of USD") +
+  viridis::scale_color_viridis(discrete = TRUE, option = "turbo") +
+  theme(text = element_text(size = 30))
+```
+
+Time series by taxonomic group
+
+```{r}
+fm_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Group == "Fungi/Microorganisms",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+in_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Group == "Invertebrates",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+pl_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Group == "Plants",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+
+ve_costs_year <-
+  sum_costs_per_country[sum_costs_per_country$Group == "Vertebrates",] %>% 
+  dplyr::group_by(Impact_year) %>% 
+  dplyr::summarise(across(5:204, sum))
+```
+
+Fungi/Microorganisms
+
+```{r}
+fm_cost_per_year <-
+  fm_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_fm_cost_per_year <-
+  fm_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_fm_cost_per_year <-
+  fm_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_fm_cost_per_year <-
+  fm_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+fm_costs_ts <-
+  data.frame(Year = fm_costs_year$Impact_year,
+             Cost = fm_cost_per_year/10^9,
+             lci = lci_fm_cost_per_year/10^9,
+             uci = uci_fm_cost_per_year/10^9,
+             sd = sd_fm_cost_per_year/10^9)
+```
+
+Invertebrates
+
+```{r}
+in_cost_per_year <-
+  in_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_in_cost_per_year <-
+  in_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_in_cost_per_year <-
+  in_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_in_cost_per_year <-
+  in_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+in_costs_ts <-
+  data.frame(Year = in_costs_year$Impact_year,
+             Cost = in_cost_per_year/10^9,
+             lci = lci_in_cost_per_year/10^9,
+             uci = uci_in_cost_per_year/10^9,
+             sd = sd_in_cost_per_year/10^9)
+```
+
+Plants
+
+```{r}
+pl_cost_per_year <-
+  pl_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_pl_cost_per_year <-
+  pl_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_pl_cost_per_year <-
+  pl_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_pl_cost_per_year <-
+  pl_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+pl_costs_ts <-
+  data.frame(Year = pl_costs_year$Impact_year,
+             Cost = pl_cost_per_year/10^9,
+             lci = lci_pl_cost_per_year/10^9,
+             uci = uci_pl_cost_per_year/10^9,
+             sd = sd_pl_cost_per_year/10^9)
+```
+
+Vertebrates
+
+```{r}
+ve_cost_per_year <-
+  ve_costs_year[-1] %>% 
+  apply(., 1, median)
+
+lci_ve_cost_per_year <-
+  ve_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.025)
+
+uci_ve_cost_per_year <-
+  ve_costs_year[-1] %>% 
+  apply(., 1, quantile, 0.975)
+
+sd_ve_cost_per_year <-
+  ve_costs_year[-1] %>% 
+  apply(., 1, sd)
+
+ve_costs_ts <-
+  data.frame(Year = ve_costs_year$Impact_year,
+             Cost = ve_cost_per_year/10^9,
+             lci = lci_ve_cost_per_year/10^9,
+             uci = uci_ve_cost_per_year/10^9,
+             sd = sd_ve_cost_per_year/10^9)
+```
+
+All groups
+
+```{r}
+groups_ts <-
+  rbind(
+    data.frame(fm_costs_ts, group = "Fungi/Microorganisms"),
+    data.frame(in_costs_ts, group = "Invertebrates"),
+    data.frame(pl_costs_ts, group = "Plants"),
+    data.frame(ve_costs_ts, group = "Vertebrates"))
+
+groups_ts_plot <-
+  ggplot(groups_ts, aes(x=Year, y=Cost, color = group))+
+  geom_line(size = 2) +
+  # geom_point(size = 4, color = "dark blue") +
+  # geom_line(aes(y = lci), size = 2,linetype="dashed") +
+  # geom_line(aes(y = uci), size = 2,linetype="dashed") +
+  theme_bw() + 
+  #ggtitle("as Economic Costs of Invasive Species") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 20),
+        axis.text.y = element_text(size = 20),  
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 12)) +
+  xlab("Year") + ylab("Billions of USD") +
+  viridis::scale_color_viridis(discrete = TRUE, option = "turbo") +
+  theme(text = element_text(size = 30))
+```
+
+# Additional tests
+
+Join all time series
+
+```{r}
+gridExtra::grid.arrange(global_ts_plot, 
+                        regions_ts_plot, 
+                        sectors_ts_plot, 
+                        groups_ts_plot,
+                        nrow = 4)
+```
+
+
+```{r}
+pairwise_jaccard <- function(df) {
+  
+  all_combos <-
+    expand.grid(df$Species, df$Species)
+  
+  all_combos <- 
+    all_combos[all_combos$Var1 != all_combos$Var2,] %>% 
+    unique
+  
+  all_jaccard <-
+    pbapply::pbapply(all_combos, 1, function(x){
+      
+      a <- df$Impacted_sector[df$Species == x[1]] %>% unique
+      b <- df$Impacted_sector[df$Species == x[2]] %>% unique
+      
+      intersection = length(intersect(a, b))
+      union = length(a) + length(b) - intersection
+      intersection/union
+      
+    })
+  
+}
+```
+
+```{r}
+genus_sp <-
+  inva_db_clean[inva_db_clean$Type_of_cost_merged %in% c("Damage"), c(3,4)] %>% 
+  unique
+
+genus_sp <- genus_sp[complete.cases(genus_sp),]
+
+repeated_genus <-
+  names(table(genus_sp$Genus))[table(genus_sp$Genus) > 1] %>% unique
+
+sp_sector <- inva_db_clean[c(4, 14)] %>% 
+  unique
+
+sp_sector <- sp_sector[complete.cases(sp_sector),]
+
+jaccard_all <- pairwise_jaccard(sp_sector)
+
+mean(jaccard_all)
+sd(jaccard_all)
+```
+
+```{r}
+sp_sector_genus <- inva_db_clean[inva_db_clean$Genus %in% repeated_genus, c(4, 14)] %>% 
+  unique
+
+sp_sector_genus <- sp_sector_genus[complete.cases(sp_sector_genus),]
+
+jaccard_genus <-
+  lapply(repeated_genus, function(this_gn){
+    
+    this_sp <-
+      genus_sp$Species[genus_sp$Genus %in% this_gn] %>% unique  
+    
+    this_sp_sector <-
+      sp_sector[sp_sector$Species %in% this_sp,]
+    
+    pairwise_jaccard(this_sp_sector)
+    
+  })
+
+mean(unlist(jaccard_genus))
+sd(unlist(jaccard_genus))
+```
+
+Similarity of costs between congeneric and noncongeneric species
+
+```{r}
+overlap_genus <-
+  sapply(repeated_genus, function(gn){
+    
+    sp_this_gn <- 
+      genus_sp$Species[genus_sp$Genus == gn]
+    
+    sp_sectors <-
+      lapply(sp_this_gn, function(sp){
+        
+        inva_db_clean$Impacted_sector[inva_db_clean$Species == sp] %>% 
+          unique()
+        
+      })
+    
+    mean_overlap <-
+      sapply(1:length(sp_sectors), function(i){
+        
+        sum(sp_sectors[[i]] %in% unlist(sp_sectors[-i]))/
+          length(sp_sectors[[i]])
+        
+      }) %>% 
+      mean
+  })
+```
