@@ -1,0 +1,1286 @@
+---
+title: "InvaCost Spatial Extrapolation"
+author: "Gabriel Caetano, Ivan Jaric, Franck Courchamp"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: default
+  rmarkdown::html_vignette:
+  toc: true
+vignette: >
+%\VignetteIndexEntry{pcpi} 
+  %\VignetteEngine{knitr::rmarkdown} 
+  %\VignetteEncoding{UTF-8}
+---
+
+# Packages
+
+Install packages (turned off automatic evaluation so it doesn't try to install them every time)
+
+```{r, eval = FALSE}
+install.packages("magrittr")
+install.packages("invacost")
+install.packages("stringr")
+install.packages("ISOcodes")
+install.packages("pbapply")
+install.packages("wbstats")
+install.packages("plyr")
+```
+
+Load packages
+
+```{r}
+library(magrittr)
+```
+
+# Load data
+
+```{r}
+inva_db <-
+  invacost::getInvaCostVersion()
+
+inva_db$Method_reliability[which(inva_db$Method_reliability_refined == "Low")] <- "Low"
+
+inva_db$Island[inva_db$Island == "Y"] <- 1
+inva_db$Island[inva_db$Island == "N"] <- 0
+
+inva_db$Island <- as.numeric(inva_db$Island)
+```
+
+What does the database looks like?
+
+```{r}
+head(inva_db)
+```
+
+# Pre-processing Invacost database
+
+First, select only relevant columns from InvaCost.
+
+```{r}
+selected_columns <-
+  c("Cost_ID",
+    "Phylum",                                     
+    "Genus",                                        
+    "Species",
+    "Probable_starting_year_adjusted",
+    "Probable_ending_year_adjusted",
+    "Environment",
+    "Official_country",
+    "Cost_estimate_per_year_2017_USD_exchange_rate",
+    "Impacted_sector",
+    "Type_of_cost_merged",
+    "Method_reliability",
+    "Spatial_scale",
+    "Implementation",
+    "Island",
+    "Acquisition_method")
+
+inva_db_sub <- 
+  inva_db[,names(inva_db) %in% selected_columns]
+```
+
+```{r}
+inva_db_clean <-
+  pbapply::pblapply(1:nrow(inva_db_sub),
+                    function(i){
+                      
+                      this_row <-  inva_db_sub[i,] 
+                      row.names(this_row) <- NULL
+                      
+                      has_multiple <- 
+                        stringr::str_detect(this_row, "/") %>% 
+                        which
+                      
+                      has_multiple <- has_multiple[has_multiple %in% c(4, 5, 7, 14, 15)]
+                      
+                      if(length(has_multiple) > 0){
+                        
+                        repeat_row <- this_row
+                        
+                        for(k in has_multiple){
+                          
+                          split_inst <-  
+                            stringr::str_split(repeat_row[1,k], "/")[[1]]
+                          
+                          split_inst_rep <- 
+                            rep(split_inst, 
+                                each = nrow(repeat_row))
+                          
+                          repeat_row <-
+                            repeat_row[rep(1:nrow(repeat_row), length(split_inst)), ]
+                          
+                          repeat_row[k] <- split_inst_rep
+                          
+                        }
+                        
+                        return(repeat_row)
+                        
+                      } else {
+                        
+                        return(this_row)
+                        
+                      }
+                    }) %>% 
+  do.call(rbind, .) %>% 
+  unique
+```
+
+Remove ambiguous entries
+
+```{r}
+inva_db_clean <- inva_db_clean[!inva_db_clean$Species %in% 
+                                 c("Diverse", 
+                                   "Unspecified", 
+                                   "others", 
+                                   "IHHN", 
+                                   "invasive ophidian", 
+                                   "invasive rodents", 
+                                   "Red tide", 
+                                   "15 other species", 
+                                   "", 
+                                   "italicum"),]
+```
+
+Fix misspellings
+
+```{r}
+inva_db_clean$Species <- stringr::str_replace(inva_db_clean$Species, "spp.", "sp.")
+inva_db_clean$Species <- stringr::str_replace(inva_db_clean$Species, "�", " ")
+inva_db_clean$Species <- stringr::str_replace(inva_db_clean$Species, "�", " ")
+
+# Species
+inva_db_clean$Species[inva_db_clean$Species %in% c("Echium")] <- "Echium sp."
+inva_db_clean$Species[inva_db_clean$Species %in% c(" Solenopsis richteri")] <- "Solenopsis richteri"
+inva_db_clean$Species[inva_db_clean$Species %in% c(" Proposis juliflora")] <- "Proposis juliflora"
+inva_db_clean$Species[inva_db_clean$Species %in% c(" Proposis velutina")] <- "Proposis velutina"
+
+inva_db_clean$Species[inva_db_clean$Species == "Felix catus"] <- "Felis catus"
+inva_db_clean$Species[inva_db_clean$Species == "Rarrus rattus"] <- "Rattus rattus"
+inva_db_clean$Species[inva_db_clean$Species == "italicum"] <- "Arum italicum"
+inva_db_clean$Species[inva_db_clean$Species == "Cylindroptunia sp."] <- "Cylindropuntia sp."
+inva_db_clean$Species[inva_db_clean$Species == "Bos taurus "] <- "Bos taurus"
+inva_db_clean$Species[inva_db_clean$Species == "Andean ?otato latent tymovirus"] <- "Andean potato latent tymovirus"
+inva_db_clean$Species[inva_db_clean$Species == " Proposis juliflora"] <- "Proposis juliflora"
+inva_db_clean$Species[inva_db_clean$Species == " Proposis velutina"] <- "Proposis velutina"
+inva_db_clean$Species[inva_db_clean$Species == " Solenopsis richteri"] <- "Solenopsis richteri"
+inva_db_clean$Species[inva_db_clean$Species == "Gaeumannomyces graminis\x86var.\x86tritici"] <- "Gaeumannomyces graminis var. tritici"
+inva_db_clean$Species[inva_db_clean$Species == "Spartina\xa0spp."] <- "Spartina spp."
+inva_db_clean$Species[inva_db_clean$Species == "Candidatus\xa0liberibacter"] <- "Candidatus liberibacter"
+inva_db_clean$Species[inva_db_clean$Species == "Casuarina equisetifolia "] <- "Casuarina equisetifolia"
+inva_db_clean$Species[inva_db_clean$Species == "Tilletia Indica"] <- "Tilletia indica"
+inva_db_clean$Species[inva_db_clean$Species == "Ralstonia Solanacearum"] <- "Ralstonia solanacearum"
+inva_db_clean$Species[inva_db_clean$Species == "Pacifastacus Leniusculus"] <- "Pacifastacus leniusculus"
+inva_db_clean$Species[inva_db_clean$Species == "Opuntia ficus-indica "] <- "Opuntia ficus-indica"
+inva_db_clean$Species[inva_db_clean$Species == "Blatella germanica"] <- "Blattella germanica"
+inva_db_clean$Species[inva_db_clean$Species == "Peach  rosette  mosaic  nepovirus "] <- "Peach  rosette  mosaic  nepovirus"
+inva_db_clean$Species[inva_db_clean$Species == "Oligonychus metasequoia"] <- "Oligonychus metasequoiae" 
+inva_db_clean$Species[inva_db_clean$Species == "Proposis pallida"] <- "Prosopis pallida"
+inva_db_clean$Species[inva_db_clean$Species == "Proposis gladulosa"] <- "Prosopis glandulosa"
+inva_db_clean$Species[inva_db_clean$Species == "Proposis juliflora"] <- "Prosopis juliflora"
+inva_db_clean$Species[inva_db_clean$Species == "Proposis velutina"] <- "Prosopis velutina" 
+inva_db_clean$Species[inva_db_clean$Species == "Robinia pseudoaccia"] <- "Robinia pseudoacacia"
+inva_db_clean$Species[inva_db_clean$Species == "Cercis siliquatrum"] <- "Cercis siliquastrum"
+inva_db_clean$Species[inva_db_clean$Species == "Lymantria disparasiatica"] <- "Lymantria dispar asiatica"
+inva_db_clean$Species[inva_db_clean$Species == "Syrindodium filiformis"] <- "Syringodium filiforme"
+inva_db_clean$Species[inva_db_clean$Species == "Clerodendrum chinese"] <- "Clerodendrum chinense"
+inva_db_clean$Species[inva_db_clean$Species == "Synedrella nodiﬂora"] <- "Synedrella nodiflora"
+inva_db_clean$Species[inva_db_clean$Species == "Optunia sp."] <- "Opuntia sp."
+
+# Impacted sector
+
+inva_db_clean$Impacted_sector[inva_db_clean$Impacted_sector == "Forestry " ] <- "Forestry"
+inva_db_clean$Impacted_sector[inva_db_clean$Impacted_sector == "Foresty" ] <- "Forestry"
+inva_db_clean$Impacted_sector[inva_db_clean$Impacted_sector == "Public and social welfare" ] <- "Public and Social Welfare"
+
+# Countries
+
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Kanya" ] <- "Kenya"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Republic of Serbia" ] <- "Serbia"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "The Bahamas" ] <- "Bahamas"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "United Republic of Tanzania" ] <- "Tanzania"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "United States of America"] <- "United States"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Venezuela"] <- "Venezuela, Bolivarian Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Vietnam"] <- "Viet Nam"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Tanzania"] <- "Tanzania, United Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "South Korea"] <- "Korea, Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Russia"] <- "Russian Federation"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Brunei"] <- "Brunei Darussalam"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Laos"] <- "Lao People's Democratic Republic"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "East Timor"] <- "Timor-Leste"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Bolivia"] <- "Bolivia, Plurinational State of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Ivory Coast"] <- "Côte d'Ivoire"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Macedonia"] <- "North Macedonia"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Moldova"] <- "Moldova, Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Democratic Republic of the Congo"] <- "Congo, The Democratic Republic of the"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Iran"] <- "Iran, Islamic Republic of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Federal States of Micronesia"] <- "Micronesia, Federated States of"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Taiwan"] <- "Taiwan, Province of China"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Turkey"] <- "Türkiye"
+inva_db_clean$Official_country[inva_db_clean$Official_country == "Swaziland"] <- "Eswatini"
+
+# Environment
+
+inva_db_clean$Environment[inva_db_clean$Environment == "Semi-Aquatic"] <- "Semi-aquatic"
+
+inva_db_clean <- unique(inva_db_clean)
+```
+
+Create Genus and Phylum columns.
+
+```{r}
+inva_db_clean$Genus <- 
+  sapply(inva_db_clean$Species, function(sp){
+    
+    possible_matches <- 
+      inva_db$Genus[match(sp, inva_db$Species)] %>% 
+      unique
+    
+    possible_matches <- 
+      possible_matches[!stringr::str_detect(possible_matches, "/")]
+    
+    ifelse(length(possible_matches) > 1, NA, possible_matches)
+    
+  })
+
+inva_db_clean$Genus[is.na(inva_db_clean$Genus)] <-
+  sapply(inva_db_clean$Species[is.na(inva_db_clean$Genus)], function(sp){
+    
+    first_space <-
+      stringr::str_locate(sp, " ")
+    
+    stringr::str_sub(sp, 1, first_space[1] - 1)
+    
+  })
+
+inva_db_clean$Phylum <- 
+  sapply(inva_db_clean$Species, function(sp){
+    
+    possible_matches <- 
+      inva_db$Phylum[match(sp, inva_db$Species)] %>% 
+      unique
+    
+    possible_matches <- 
+      possible_matches[!stringr::str_detect(possible_matches, "/")]
+    
+    ifelse(length(possible_matches) > 1, NA, possible_matches)
+    
+  })
+
+inva_db_clean$Phylum[is.na(inva_db_clean$Phylum)] <- 
+  sapply(inva_db_clean$Genus[is.na(inva_db_clean$Phylum)], function(sp){
+    
+    possible_matches <- 
+      inva_db$Phylum[match(sp, inva_db$Genus)] %>% 
+      unique
+    
+    possible_matches <- 
+      possible_matches[!stringr::str_detect(possible_matches, "/")]
+    
+    ifelse(length(possible_matches) > 1, NA, possible_matches)
+    
+  })
+```
+
+Manually assign Phyla to missing entries
+
+```{r}
+inva_db_clean$Phylum[inva_db_clean$Species == "IHHN"] <- "Cossaviricota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Arum italicum"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Syringodium filiforme"] <- "Tracheophyta"
+
+inva_db_clean$Phylum[inva_db_clean$Species == "Acaciella angustissima"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Aeonium sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Aeschynomene brasiliana"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Aeschynomene paniculata"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Andean potato latent tymovirus"] <- "Kitrinoviricota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Andropogon gayanus"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Anthemis cotula"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Antigonon leptopus"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Aphelenchoides ritzemabosi"] <- "Nematoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Atriplex semibaccata"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Batis maritima"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Boa constrictor"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Botrylloides violaceus"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Botryllus schlosseri"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Brachiara sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Brachychiton populneus"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Caesalpinia decapetala"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Caiman crocodilus"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Cercis siliquastrum"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Chironomus crassicaudatus"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Chlorophytum comosum"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Chrysemys picta"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Clerodendrum chinense"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Coccinia grandis"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Cocos nucifera"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Colubrina asiatica"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Curcumis sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Danio rerio"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Dimorphoteca sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Dioscorea bulbifera"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Disphyma sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Dittrichia viscosa"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Ditylenchus dipsaci"] <- "Nematoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Drosophyllum sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Gallirallus australis"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Glossina sp."] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Glyptotendipes paripes"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Indigofera schimperi"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Juniperus osteosperma"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Limnocharis flava"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Malephora crocea"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Mauremys reevesii"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Olea europaea"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Paraserianthes lophantha"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Parlatoria sp."] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Peach  rosette  mosaic  nepovirus"] <- "Pisuviricota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Peach latent mosaic viroid"] <- "Viroid"
+inva_db_clean$Phylum[inva_db_clean$Species == "Peronosclerospora sp."] <- "Oomycota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Phoma sp."] <- "Ascomycota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Phytophtora sp."] <- "Oomycota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Piper auritum"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Platanus hispanica"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Portulacaria afra"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Potato virus T"] <- "Pisuviricota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Potato virus Y"] <- "Pisuviricota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Rhizophora mangle"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Rupicapra rupicapra"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Schefflera actinophylla"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Scolytus sp."] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Silybum marianum"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Thunbergia grandiflora"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Trichopodus trichopterus"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Tylenchulus semipenetrans"] <- "Nematoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Zygophyllum fabago"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Alburnus alburnus"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Amandava amandava"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Bryophyllum pinnatum"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Cyclachaena xanthiifolia"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Emex spinosa"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Erythrocebus patas"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Estrilda astrild"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Fraxinus floribunda"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Genetta genetta"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Hemorrhois hippocrepis"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Laucadendron sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Leucospermum sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Malpolon monspessulanus"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Mauremys sinensis"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Misgurnus anguillicaudatus"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Opuntia sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Oryzaephilus surinamensis"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Pelodiscus sinensis"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Protea sp."] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Pseudemys concinna"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Pseudemys nelsoni"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Pseudemys sp."] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Pseudosesarma moeschii"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Rhyzopertha dominica"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Scyphophorus acupunctatus"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Taeniothrips inconsequens"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Acarapis woodi"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Bryophyllum houghtonii"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "Hydropotes inermis"] <- "Chordata"
+inva_db_clean$Phylum[inva_db_clean$Species == "Orconectes limosus"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Rhaponticum repens"] <- "Tracheophyta"
+inva_db_clean$Phylum[inva_db_clean$Species == "WSSV"] <- "Virus"
+inva_db_clean$Phylum[inva_db_clean$Species == "Blatta orientalis"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Blattella germanica"] <- "Arthropoda"
+inva_db_clean$Phylum[inva_db_clean$Species == "Maize lethal necrosis"] <- "Pisuviricota"
+
+inva_db_clean$Phylum[inva_db_clean$Species == "Urosalpinx cinerea"] <- "Mollusca"
+inva_db_clean$Phylum[inva_db_clean$Species == "Phakopsora sp."] <- "Basidiomycota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Lachnellula chrysophthalma"] <- "Ascomycota"
+inva_db_clean$Phylum[inva_db_clean$Species == "Heterobasidion annosum"] <- "Basidiomycota"
+```
+
+Group Phyla into broader groups.
+
+```{r}
+inva_db_clean$Group <- NA
+inva_db_clean$Group[inva_db_clean$Phylum == "Chordata"] <- "Vertebrates"
+
+inva_db_clean$Group[inva_db_clean$Phylum == "Arthropoda"] <- "Invertebrates"
+
+inva_db_clean$Group[inva_db_clean$Phylum == "Nematoda"] <- "Invertebrates"          
+inva_db_clean$Group[inva_db_clean$Phylum == "Platyhelminthes"] <- "Invertebrates"
+inva_db_clean$Group[inva_db_clean$Phylum == "Annelida"] <- "Invertebrates"
+inva_db_clean$Group[inva_db_clean$Phylum == "Cnidaria"] <- "Invertebrates"
+inva_db_clean$Group[inva_db_clean$Phylum == "Mollusca"] <- "Invertebrates"  
+inva_db_clean$Group[inva_db_clean$Phylum == "Ctenophora"] <- "Invertebrates"  
+
+inva_db_clean$Group[inva_db_clean$Phylum == "Tracheophyta"] <- "Plants" 
+
+inva_db_clean$Group[inva_db_clean$Phylum == "Oomycota"] <- "Fungi/Microorganisms"     
+inva_db_clean$Group[inva_db_clean$Phylum == "Basidiomycota"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Chytridiomycota"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Ascomycota"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Ascomyceta"] <- "Fungi/Microorganisms"
+
+inva_db_clean$Group[inva_db_clean$Phylum == "Proteobacteria"] <- "Fungi/Microorganisms" 
+inva_db_clean$Group[inva_db_clean$Phylum == "Cressdnaviricota"] <- "Fungi/Microorganisms" 
+inva_db_clean$Group[inva_db_clean$Phylum == "Actinobacteriota"] <- "Fungi/Microorganisms"            
+inva_db_clean$Group[inva_db_clean$Phylum == "Negarnaviricota"] <- "Fungi/Microorganisms"   
+inva_db_clean$Group[inva_db_clean$Phylum == "Pisuviricota"] <- "Fungi/Microorganisms"       
+inva_db_clean$Group[inva_db_clean$Phylum == "Kitrinoviricota"] <- "Fungi/Microorganisms"    
+inva_db_clean$Group[inva_db_clean$Phylum == "Nucleocytoviricota"] <- "Fungi/Microorganisms"  
+inva_db_clean$Group[inva_db_clean$Phylum == "Peploviricota"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Cossaviricota"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Pospiviroidae"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Virus"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Viroid"] <- "Fungi/Microorganisms"
+
+inva_db_clean$Group[inva_db_clean$Phylum == "Ochrophyta"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Chlorophyta"] <- "Fungi/Microorganisms"
+inva_db_clean$Group[inva_db_clean$Phylum == "Haptophyta"] <- "Fungi/Microorganisms"
+```
+
+Assign iso2 codes and m49 subregions to countries
+
+```{r}
+inva_db_clean$iso2 <- 
+  ISOcodes::ISO_3166_1$Alpha_2[match(inva_db_clean$Official_country,
+                                     ISOcodes::ISO_3166_1$Name)]
+
+inva_db_clean$iso2[inva_db_clean$Official_country == "Kosovo"] <- "XK"
+```
+
+```{r}
+inva_db_clean$Island[inva_db_clean$Official_country %in% c("Italy",
+"United States",
+"Germany",
+"China",
+"Sweden",       
+"Netherlands",
+"Canada",
+"India",
+"Argentina",
+"Portugal",     
+"South Africa",
+"Viet Nam",
+"Peru",
+"Brazil",
+"Pakistan",     
+"Norway",
+"France",                            
+"Spain",                            
+"Chile",                              
+"Denmark",                          
+"Malaysia",                          
+"Myanmar",                          
+"Thailand",                          
+"Lithuania", 
+"Belgium",                          
+"Australia",                         
+"Venezuela, Bolivarian Republic of",
+"Dominican Republic",                
+"Tanzania, United Republic of",     
+"Singapore",                         
+"Greece",                           
+"Mexico",                            
+"Libya",                            
+"Hungary",                           
+"Austria",                          
+"Belize",                            
+"Guatemala",          
+"Benin",                             
+"Kenya",                            
+"Israel",                            
+"Egypt",                            
+"Colombia",                          
+"Ecuador",                          
+"Ghana",                             
+"Guinea",                           
+"Togo",                              
+"Bulgaria",                         
+"Georgia",                           
+"Romania",                          
+"Russian Federation",                
+"Türkiye",                          
+"Ukraine",                           
+"Bhutan",                           
+"Cambodia",                          
+"Lao People's Democratic Republic", 
+"Panama",                            
+"El Salvador",                      
+"Bolivia, Plurinational State of",   
+"Costa Rica",                       
+"Honduras",                          
+"Nicaragua",                        
+"Paraguay",                          
+"Suriname",                         
+"Uruguay",                           
+"Bangladesh",                         
+"Finland",
+"Korea, Republic of")] <- 0
+
+inva_db_clean$Island[inva_db_clean$Official_country %in% c("Japan",
+                                                           "Philippines",  
+"Papua New Guinea",                  
+"Grenada",                          
+"Trinidad and Tobago",               
+"Saint Kitts and Nevis",            
+"Saint Lucia",                       
+"Saint Vincent and the Grenadines",                                       
+"Sri Lanka",
+"Seychelles",
+"New Zealand")] <- 1
+```
+
+```{r}
+Amelia::missmap(inva_db_clean)
+
+saveRDS(inva_db_clean, "inva_db_clean2.rds")
+```
+
+# Create table to train model
+
+Remove low reliability data points and get only data points at country level
+
+```{r}
+inva_db_clean <- readRDS("inva_db_clean2.rds")
+
+inva_db_exp <- inva_db_clean
+
+inva_db_exp <- 
+  inva_db_exp[!inva_db_exp$Cost_ID %in% 
+                inva_db$Cost_ID[stringr::str_detect(inva_db$Species, "/")],]
+
+dim(inva_db_exp)
+
+inva_db_exp <- 
+  inva_db_exp[!inva_db_exp$Cost_ID %in% 
+                inva_db$Cost_ID[stringr::str_detect(inva_db$Environment, "/")],]
+
+dim(inva_db_exp)
+
+inva_db_exp <- inva_db_exp[!inva_db_exp$Environment %in% 
+                                 c("Diverse", 
+                                   "Unspecified"),]
+
+dim(inva_db_exp)
+
+inva_db_exp <- 
+  inva_db_exp[!inva_db_exp$Cost_ID %in% 
+                inva_db$Cost_ID[stringr::str_detect(inva_db$Impacted_sector, "/")],]
+
+inva_db_exp <- 
+  inva_db_exp[!is.na(inva_db_exp$Impacted_sector),]
+
+dim(inva_db_exp)
+
+inva_db_exp <- 
+  inva_db_exp[!is.na(inva_db_exp$Type_of_cost_merged),]
+
+inva_db_exp <- 
+  inva_db_exp[inva_db_exp$Type_of_cost_merged == "Damage",]
+
+dim(inva_db_exp)
+
+inva_db_exp <- 
+  inva_db_exp[inva_db_exp$Implementation == "Observed",]
+
+dim(inva_db_exp)
+
+inva_db_exp <- 
+  inva_db_exp[inva_db_exp$Method_reliability == "High",]
+
+dim(inva_db_exp)
+
+inva_db_exp <- 
+  inva_db_exp[inva_db_exp$Spatial_scale == "Country",]
+
+dim(inva_db_exp)
+
+inva_db_exp <- 
+  inva_db_exp[!is.na(inva_db_exp$Probable_starting_year_adjusted),]
+
+dim(inva_db_exp)
+
+inva_db_exp <- inva_db_exp[complete.cases(inva_db_exp),]
+
+dim(inva_db_exp)
+```
+
+Temporal expansion using InvaCost package
+
+```{r}
+inva_db_exp <-
+  inva_db_exp[inva_db_exp$Probable_starting_year_adjusted != 0 &
+                inva_db_exp$Probable_ending_year_adjusted != 0,]
+
+inva_db_exp <-
+  invacost::expandYearlyCosts(inva_db_exp,
+                              startcolumn = "Probable_starting_year_adjusted",
+                              endcolumn = "Probable_ending_year_adjusted")
+
+inva_db_exp <- inva_db_exp[inva_db_exp$Impact_year < 2021,]
+
+expanded_ids <-
+  table(inva_db_exp$Cost_ID)[table(inva_db_exp$Cost_ID) > 1] %>% 
+  names
+
+sampled_expanded <-
+  lapply(expanded_ids, function(id){
+    
+    random_year <-
+      inva_db_exp$Impact_year[which(inva_db_exp$Cost_ID == id)] %>% 
+      sample(1)
+    
+    inva_db_exp[inva_db_exp$Cost_ID == id &
+                  inva_db_exp$Impact_year == random_year,]
+    
+  }) %>% 
+  do.call(rbind, .)
+
+inva_db_exp <-
+  rbind(inva_db_exp[!inva_db_exp$Cost_ID %in% expanded_ids,],
+  sampled_expanded)
+
+inva_db_exp$log_Cost <-
+  log(inva_db_exp$Cost_estimate_per_year_2017_USD_exchange_rate)
+
+#write.csv(inva_db_exp, "inva_db_exp.csv", row.names = FALSE)
+```
+
+Remove outliers
+
+```{r, warning=FALSE}
+upper_bound <-
+  quantile(inva_db_exp$Cost_estimate_per_year_2017_USD_exchange_rate, 0.975)
+
+lower_bound <-
+  quantile(inva_db_exp$Cost_estimate_per_year_2017_USD_exchange_rate, 0.025)
+
+inva_db_exp <-
+  inva_db_exp[inva_db_exp$Cost_estimate_per_year_2017_USD_exchange_rate < upper_bound & inva_db_exp$Cost_estimate_per_year_2017_USD_exchange_rate > lower_bound,]
+
+dim(inva_db_exp)
+```
+
+# WorldBank socioeconomic data
+
+Find which indicators are available for what countries
+
+```{r, eval = FALSE}
+cachelist <- wbstats::wb_cache()
+```
+
+Download all indicators from WorldBank and extract country information
+
+```{r, eval = FALSE, warning = FALSE}
+to_download <- cachelist$indicators$indicator_id
+
+# In case downloading is interrupted, just run again from here:
+all_files <- cachelist$indicators$indicator_id
+
+downloaded_files <-
+  list.files("C:/Users/gabri/Desktop/wb_indicators_cntr",
+             pattern = "^indicator_") %>%
+  stringr::str_sub(11, -5)
+
+to_download <- all_files[!all_files %in% downloaded_files]
+
+inds_cntr <- 
+  pbapply::pblapply(to_download, 
+                    function(ind){
+                      
+                      this_ind <- 
+                        try(wbstats::wb_data(ind, mrv = 5,
+                                             gapfill = TRUE), silent = TRUE)
+                      
+                      if(class(this_ind)[1] == "try-error"){
+                        
+                        return(this_ind)
+                        
+                      } else if(ncol(this_ind) == 0){ 
+                        
+                        return(NULL)
+                        
+                      } else {
+                        
+                        saveRDS(this_ind,
+                                paste0("C:/Users/gabri/Desktop/wb_indicators_cntr/indicator_", ind, ".rds"))
+                        
+                        this_ind$iso2c[!is.na(this_ind[5])]
+                        
+                      }
+                      
+                    })
+
+saveRDS(inds_cntr, "inds_cntr.rds")
+```
+
+Read all in a single table
+
+```{r, eval = FALSE}
+inds_cntr <-
+  pbapply::pblapply(list.files("C:/Users/gabri/Desktop/wb_indicators_cntr", pattern = "^indicator_", 
+                               full.names = TRUE), 
+                    function(fl){
+                      
+                      readRDS(fl)
+                      
+                    })
+
+dl_names <-
+  list.files("C:/Users/gabri/Desktop/wb_indicators_cntr", pattern = "^indicator_") %>%
+  stringr::str_sub(11, -5)
+
+names(inds_cntr) <- dl_names
+
+saveRDS(inds_cntr, "inds_cntr.rds")
+```
+
+Get only indicators available for all UN member states in InvaCost
+
+```{r}
+inva_countries <- unique(inva_db_exp$iso2)
+un_members <- read.csv("un_members.csv")
+un_members$iso2 <- stringr::str_sub(un_members$iso2, 1, 2)
+inva_countries <- inva_countries[inva_countries %in% un_members$iso2]
+```
+
+```{r, eval = FALSE}
+inds_cntr <- readRDS("inds_cntr.rds")
+
+compl_index <-
+  pbapply::pbsapply(inds_cntr, function(x) {
+    
+    nona <- x[!is.na(x[,5]),]
+    nona <- nona[nona$iso2c %in% un_members$iso2,]
+    sum(inva_countries %in% nona$iso2c) ==
+      length(inva_countries)
+    
+  })
+
+compl_indicators <- names(inds_cntr)[compl_index]
+
+complete_indicators <-
+  cachelist$indicators[cachelist$indicators$indicator_id %in% compl_indicators,]
+
+write.csv(complete_indicators[-6], 
+          "complete_indicators.csv", 
+          row.names = FALSE)
+```
+
+Select appropriate predictors
+
+```{r}
+inds_cntr <- readRDS("inds_cntr.rds")
+
+complete_indicators <- 
+  read.csv("complete_indicators.csv")
+
+selected_inds <-
+  c("AG.LND.AGRI.K2",
+    "AG.LND.FRST.K2",
+    "AG.LND.TOTL.K2",
+    "C1.2",
+    "ER.FSH.CAPT.MT",
+    "ER.LND.PTLD.ZS",
+    "NV.AGR.TOTL.CD",
+    "NY.GDP.MKTP.CD",
+    "RQ.EST",
+    "SP.DYN.LE00.IN")
+
+selected_indicators <- 
+  complete_indicators[complete_indicators$indicator_id %in% selected_inds,] %>% 
+  as.data.frame()
+
+write.csv(selected_indicators, 
+          "selected_indicators.csv",
+          row.names = FALSE)
+
+inds_clean_list <-
+  inds_cntr[names(inds_cntr) %in% selected_inds]
+
+inds_df <-
+  lapply(inds_clean_list, function(x){
+    
+    out <-
+      lapply(unique(x$iso2c), function(y){
+        
+        this <- x[x$iso2c == y,c(1,4,5)]
+        this[complete.cases(this),]
+        
+      }) %>% 
+      do.call(rbind, .)
+    
+    out[out$date == max(out$date),c(1,3)]
+    
+  })
+```
+
+Organize final table of indicators with only relevant columns
+
+```{r}
+inds_df <-
+  plyr::join_all(inds_df, by='iso2c', type='full')
+
+inds_df[-1] <- missForest::missForest(inds_df[-1])$ximp
+
+inds_df <- inds_df[inds_df$iso2c %in% un_members$iso2,]
+
+names(inds_df)[-1] <-
+  c("Agricultural land (sq. km)",                                   
+    "Forest area (sq. km)",                                         
+    "Land area (sq. km)",                                           
+    "Population",                                                   
+    "Capture fisheries production (metric tons)",                   
+    "Terrestrial protected areas (% of total land area)",           
+    "Agriculture, forestry, and fishing, value added (current US$)",
+    "GDP (current US$)",                                            
+    "Regulatory Quality: Estimate",                                 
+    "Life expectancy at birth, total (years)")
+
+inds_df <- inds_df[!apply(inds_df, 2, function(x) any(is.na(x)))]
+
+m49 <- read.csv("m49_full.csv")
+
+m49$iso2 <- 
+  ISOcodes::ISO_3166_1$Alpha_2[match(m49$iso_alpha3_code, 
+                                     ISOcodes::ISO_3166_1$Alpha_3)]
+
+inds_df$subregion <- 
+  m49$subregion_name[match(inds_df$iso2,  m49$iso2)]
+
+inds_df$subregion[inds_df$iso2 == "TW"] <- "Eastern Asia"
+inds_df$subregion[inds_df$iso2 == "XK"] <- "Southern Europe"
+```
+
+```{r}
+inds_df$Island <- 
+  inva_db_clean$Island[match(inds_df$iso2c, inva_db_clean$iso2)]
+
+inds_df$Island[inds_df$iso2c %in% c("AF",
+"AD",
+"AM",
+"AZ",
+"BI",
+"BW",
+"CG",
+"DJ",
+"DZ",
+"ER",
+"GA",
+"GM",
+"GQ",
+"GY",
+"IQ",
+"JO",
+"KZ",
+"KG",
+"LB",
+"LR",
+"LI",
+"LS",
+"MN",
+"KP",
+"SD",
+"SL",
+"SM",
+"SO",
+"SS",
+"SY",
+"TD",
+"TJ",
+"TM",
+"UZ",
+"YE",
+"MC")] <- 0
+
+inds_df$Island[inds_df$iso2c %in% c("BS","CV","DM","HT","VC")] <- 1
+```
+
+```{r}
+imf_gdp <- read.csv("imf_gdp.csv")
+inds_df$`GDP (current US$)`
+
+write.csv(inds_df, "inds_df.csv", row.names = FALSE)
+```
+
+# Create list of species per country 
+
+InvaCost records
+
+```{r}
+country_species_inva <-
+  data.frame(sp =  inva_db_clean[!is.na(inva_db_clean$iso2),]$Species,
+             country =  inva_db_clean[!is.na(inva_db_clean$iso2),]$iso2) %>% 
+  unique
+
+saveRDS(country_species_inva, "country_species_inva.rds")
+```
+
+Compile GRIIS records
+
+```{r, eval = FALSE}
+griis_files <- 
+  list.files("GRIIS_files", full.names = TRUE)
+
+griis_df <-
+  lapply(griis_files, function(fl){
+    
+    griis_fl <-
+      read.csv(fl)
+    
+    if(!"accepted_name" %in% colnames(griis_fl)){
+      
+      griis_fl <- data.frame(griis_fl, accepted_name = NA)
+      
+    }
+    
+    griis_fl
+    
+  }) %>% 
+  do.call(rbind, .)
+
+griis_df$accepted_name.species[griis_df$scientific_name == "Synedrella nodiflora Gaertn."] <- "Synedrella nodiflora"
+griis_df$accepted_name.species[griis_df$scientific_name == "Synedrella nodiflora (L.) Gaertn."] <- "Synedrella nodiflora"
+griis_df$accepted_name.species[griis_df$scientific_name == "Synedrella nodiﬂora"] <- "Synedrella nodiflora"
+griis_df$accepted_name.species[griis_df$scientific_name == "Clarias gariepinus (Burchell, 1822)"] <- "Clarias gariepinus"
+
+write.csv(griis_df, "griis_df.csv", row.names = FALSE)
+```
+
+Get list of species per country from GRIIS
+
+```{r}
+griis_df <- read.csv("griis_df.csv")
+
+country_species_griis <- 
+  data.frame(sp = griis_df$accepted_name.species[griis_df$is_invasive == "invasive"],
+             country = ISOcodes::ISO_3166_1$Alpha_2[match(griis_df$checklist.iso_countrycode_alpha3[griis_df$is_invasive == "invasive"],
+                                                          ISOcodes::ISO_3166_1$Alpha_3)]) %>% 
+  unique
+
+saveRDS(country_species_griis, "country_species_griis.rds")
+```
+
+```{r}
+country_species_inva <-
+  country_species_inva[country_species_inva$country %in% un_members$iso2,]
+
+country_species_griis <-
+  country_species_griis[country_species_griis$country %in% un_members$iso2,]
+```
+
+```{r}
+country_species_inva <- readRDS("country_species_inva.rds")
+country_species_griis <- readRDS("country_species_griis.rds")
+
+country_species <- 
+  rbind(country_species_inva,
+        country_species_griis) %>% 
+  unique
+
+saveRDS(country_species, "country_species.rds")
+```
+
+```{r}
+country_species <- readRDS("country_species.rds")
+```
+
+# Earliest occurrence data
+
+```{r, eval = FALSE}
+earliest_occurrence_inva <-
+  pbapply::pbapply(country_species_inva, 1, function(x){
+    
+    match_sp_country <-
+      which(stringr::str_detect(inva_db_clean$Species, x[1]) & inva_db_clean$iso2 == x[2])
+    
+    if(length(match_sp_country) == 0) return(NA)
+    
+    possible_years <-
+      inva_db_clean$Probable_starting_year_adjusted[match_sp_country]
+    
+    if(sum(possible_years, na.rm = TRUE) == 0) return(NA)
+    
+    min(possible_years[possible_years != 0], na.rm = TRUE)
+    
+  })
+
+earliest_occurrence_inva <-
+  data.frame(country_species_inva,
+             year = earliest_occurrence_inva)
+
+earliest_occurrence_inva <- earliest_occurrence_inva[earliest_occurrence_inva$year < 2021,]
+earliest_occurrence_inva <- earliest_occurrence_inva[complete.cases(earliest_occurrence_inva),]
+
+saveRDS(earliest_occurrence_inva, "earliest_occurrence_inva.rds")
+```
+
+Pre process Seebens table
+
+```{r, eval = FALSE}
+seebens_db <- 
+  read.csv("seebens_db.csv")
+
+seebens_db$iso2 <-
+  ISOcodes::ISO_3166_1$Alpha_2[match(seebens_db$Region, 
+                                     ISOcodes::ISO_3166_1$Name)]
+
+seebens_db$iso2[is.na(seebens_db$iso2)] <-
+  ISOcodes::ISO_3166_1$Alpha_2[match(seebens_db$Region[is.na(seebens_db$iso2)], 
+                                     ISOcodes::ISO_3166_1$Official_name)]
+
+seebens_db$iso2[is.na(seebens_db$iso2)] <-
+  ISOcodes::ISO_3166_1$Alpha_2[match(seebens_db$Region[is.na(seebens_db$iso2)], 
+                                     ISOcodes::ISO_3166_1$Common_name)]
+
+seebens_db$Region[is.na(seebens_db$iso2)] %>% 
+  unique
+
+seebens_db$Taxon[stringr::str_detect(seebens_db$Taxon, "\\)$")] 
+
+seebens_db$Taxon[seebens_db$Taxon == "Gastrancistrus salicis)"] <- "Gastrancistrus salicis"
+seebens_db$Taxon[seebens_db$Taxon == "Hyponeura gleadowi)"] <- "Hyponeura gleadowi"
+seebens_db$Taxon[seebens_db$Taxon == "Tetracnemus pretiosus)"] <- "Tetracnemus pretiosus"
+seebens_db$Taxon[seebens_db$Taxon == "Ponera oblongiceps)"] <- "Ponera oblongiceps"
+seebens_db$Taxon[seebens_db$Taxon == "Notostaurus albicornis)"] <- "Notostaurus albicornis"
+
+seebens_db$iso2[seebens_db$Region %in% c("Hawaiian Islands", "Virgin Islands, US", "US Minor Outlying Islands")] <- "US"
+seebens_db$iso2[seebens_db$Region %in% c("Russia")] <- "RU"
+seebens_db$iso2[seebens_db$Region %in% c("Canary Islands", "Balearic Islands")] <- "ES"
+seebens_db$iso2[seebens_db$Region %in% c("Azores", "Madeira")] <- "PT"
+seebens_db$iso2[seebens_db$Region %in% c("Channel Islands", "Shetland Islands", "Chagos Archipelago", "Saint Helena", "Ascension", "Turks and Caicos", "Falkland Islands", "Pitcairn Islands", "Tristan da Cunha")] <- "GB"
+seebens_db$iso2[seebens_db$Region %in% c("Syria")] <- "SY"
+seebens_db$iso2[seebens_db$Region %in% c("Tasmania", "Lord Howe Island")] <- "AU"
+seebens_db$iso2[seebens_db$Region %in% c("Reunion", "Saint Barthelemy", "Corse", "Kerguelen Islands", "Clipperton Island", "Amsterdam Island", "Crozet Islands Group", "Saint Paul (France)", "Scattered Islands", "Saint Martin")] <- "FR"
+seebens_db$iso2[seebens_db$Region %in% c("Ryukyu Islands", "Izu Islands", "Ogasawara Islands")] <- "JP"
+seebens_db$iso2[seebens_db$Region %in% c("Sulawesi", "Bali", "Biak")] <- "ID"
+seebens_db$iso2[seebens_db$Region %in% c("Bonaire", "Curacao", "Sint Maarten")] <- "NL"
+seebens_db$iso2[seebens_db$Region %in% c("Crete")] <- "GR"
+seebens_db$iso2[seebens_db$Region %in% c("Anticosti Island", "Vancouver Island")] <- "CA"
+seebens_db$iso2[seebens_db$Region %in% c("Sicily", "Sardinia")] <- "IT"
+seebens_db$iso2[seebens_db$Region %in% c("Swaziland")] <- "SZ"
+seebens_db$iso2[seebens_db$Region %in% c("Cape Verde")] <- "CV"
+seebens_db$iso2[seebens_db$Region %in% c("Aland Islands")] <- "FI"
+seebens_db$iso2[seebens_db$Region %in% c("Cote D'Ivoire")] <- "CI"
+seebens_db$iso2[seebens_db$Region %in% c("Iran")] <- "IR"
+seebens_db$iso2[seebens_db$Region %in% c("Laos")] <- "LA"
+seebens_db$iso2[seebens_db$Region %in% c("Macedonia")] <- "MK"
+seebens_db$iso2[seebens_db$Region %in% c("Palestinian Territory, Occupied")] <- "IL"
+seebens_db$iso2[seebens_db$Region %in% c("Zanzibar Island")] <- "TZ"
+seebens_db$iso2[seebens_db$Region %in% c("Congo, Democratic Republic of the")] <- "CD"
+seebens_db$iso2[seebens_db$Region %in% c("Galapagos")] <- "EC"
+seebens_db$iso2[seebens_db$Region %in% c("Andaman and Nicobar Islands")] <- "IN"
+seebens_db$iso2[seebens_db$Region %in% c("Rodriguez Island")] <- "MU"
+seebens_db$iso2[seebens_db$Region %in% c("Socotra Island")] <- "YE"
+seebens_db$iso2[seebens_db$Region %in% c("Easter Island")] <- "CL"
+seebens_db$iso2[seebens_db$Region %in% c("Kermadec Islands")] <- "NZ"
+seebens_db$iso2[seebens_db$Region %in% c("Timor Leste")] <- "TL"
+seebens_db$iso2[seebens_db$Region %in% c("Fernando De Noronha")] <- "BR"
+seebens_db$iso2[seebens_db$Region %in% c("Sea of Cortez Islands")] <- "MX"
+
+seebens_db_usa <-
+  seebens_db[seebens_db$Region == "USACanada",]
+seebens_db_usa$iso2 <- "US"
+
+seebens_db$iso2[seebens_db$Region %in% c("USACanada")] <- "CA"
+
+seebens_db <-
+  rbind(seebens_db,
+        seebens_db_usa)
+```
+
+```{r, eval = FALSE}
+earliest_occurrence_seebens <- 
+  seebens_db[c(1,9,5)]
+
+names(earliest_occurrence_seebens) <- c("sp", "country", "year")
+
+earliest_occurrence_seebens <-
+  earliest_occurrence_seebens %>% 
+  dplyr::group_by(sp, country) %>% 
+  dplyr::summarise(year = min(year))
+
+saveRDS(earliest_occurrence_seebens, "earliest_occurrence_seebens.rds")
+```
+
+Earliest occurrences from GBIF
+
+```{r, warning=FALSE, eval = FALSE}
+library(rgbif)
+
+earliest_occurrence_gbif <- country_species
+earliest_occurrence_gbif$year <- NA
+
+pb <- 0
+time_step <- 0
+
+for(i in 1:nrow(country_species)){
+  
+  start <- Sys.time()
+  
+  new_pb <- round(100*(i/16697),1)
+  
+  time_remaining <- 
+    (nrow(country_species) - i)*time_step/60
+  
+  if(new_pb > pb) cat(paste(rep("\b", 100), collapse = ""), 
+                      new_pb,
+                      "% completed, ", 
+                      round(time_remaining, 1), 
+                      " minutes remaining")
+  
+  pb <- new_pb
+  
+  if(!is.na(earliest_occurrence_gbif$year[i])) {
+    end <- Sys.time()
+    time_step <- end - start
+    next()}
+  
+  try({
+    x <- country_species[i,] %>% unlist
+    
+    gbif_taxon_key <- 
+      unique(x[1]) %>% 
+      rgbif::name_backbone_checklist() %>% 
+      dplyr::filter(!matchType == "NONE")
+    
+    if(length(gbif_taxon_key$usageKey) == 0) {
+      end <- Sys.time()
+      time_step <- end - start
+      next()}
+    
+    by_year <- 
+      rgbif::occ_count(taxonKey = gbif_taxon_key$usageKey, 
+                       facet = "year", 
+                       country=x[2],
+                       facetLimit = 1000)
+    
+    earliest_occurrence_gbif$year[i] <- min(by_year$year)
+  }, silent = TRUE)
+  
+  
+  end <- Sys.time()
+  time_step <- end - start
+  
+}
+
+earliest_occurrence_gbif$year <- as.numeric(earliest_occurrence_gbif$year)
+
+saveRDS(earliest_occurrence_gbif, "earliest_occurrence_gbif.rds")
+```
+
+Join earliest occurrences from InvaCost, Seebens and GBIF
+
+```{r}
+earliest_occurrence_inva <- readRDS("earliest_occurrence_inva.rds")
+earliest_occurrence_seebens <- readRDS("earliest_occurrence_seebens.rds")
+earliest_occurrence_gbif <- readRDS("earliest_occurrence_gbif.rds")
+
+earliest_occurrence <- country_species
+
+earliest_occurrence$year <- 
+  pbapply::pbapply(country_species, 1, function(r){
+    
+    year_gbif <-
+      earliest_occurrence_gbif$year[earliest_occurrence_gbif$sp == r[1] &
+                                      earliest_occurrence_gbif$country == r[2]]
+    
+    if(length(year_gbif) == 0) year_gbif <- NA
+    
+    year_inva <-
+      earliest_occurrence_inva$year[earliest_occurrence_inva$sp == r[1] &
+                                      earliest_occurrence_inva$country == r[2]]
+    
+    if(length(year_inva) == 0) year_inva <- NA
+    
+    year_seebens <-
+      earliest_occurrence_seebens$year[earliest_occurrence_seebens$sp == r[1] &
+                                         earliest_occurrence_seebens$country == r[2]]
+    
+    if(length(year_seebens) == 0) year_seebens <- NA
+    
+    if(all(is.na(c(year_inva, year_seebens, year_gbif)))) return(NA)
+    
+    min(year_gbif,
+        year_inva,
+        year_seebens,
+        na.rm = TRUE)
+  })
+
+earliest_occurrence$year[is.infinite(earliest_occurrence$year)] <- NA
+
+earliest_occurrence <- earliest_occurrence[complete.cases(earliest_occurrence),]
+
+saveRDS(earliest_occurrence, "earliest_occurrence.rds")
+```
+
+# Calculate years since invasion
+
+```{r}
+earliest_occurrence <- readRDS("earliest_occurrence.rds")
+
+inva_db_exp$years_since_invasion <-
+  pbapply::pbsapply(1:nrow(inva_db_exp),  function(r){
+    
+    out <-
+      inva_db_exp[r,1] - 
+      earliest_occurrence$year[earliest_occurrence$sp == inva_db_exp[r, 5] &
+                                 earliest_occurrence$country == inva_db_exp[r, 19]]
+    
+    if(length(out) == 0) NA else out
+    
+  })
+
+write.csv(inva_db_exp, "inva_db_exp2.csv", row.names = FALSE)
+```
+
+# Create final table for extrapolation
+
+```{r, warning=FALSE}
+pred_sp_all <-
+  pbapply::pbapply(country_species, 1, function(r){
+    
+    this_genus <-
+      stringr::str_sub(r[1], 1, stringr::str_locate(r[1], " ")[1] - 1)
+    
+    this_db <-
+      inva_db_clean[inva_db_clean$Genus == this_genus, c(14, 5, 15, 17)]
+    
+    if(nrow(this_db) == 0) return(NULL)
+    
+    out <-
+      data.frame(Species = r[1],
+                 this_db) %>% 
+      unique
+    
+  }) %>% 
+  do.call(rbind, .) %>% 
+  unique
+
+dim(pred_sp_all)
+pred_sp_all$Species %>% unique %>% length
+
+pred_sp_all <- pred_sp_all[!pred_sp_all$Environment == "Diverse",]
+
+dim(pred_sp_all)
+pred_sp_all$Species %>% unique %>% length
+
+pred_sp_all <- pred_sp_all[!pred_sp_all$Environment == "Unspecified",]
+
+dim(pred_sp_all)
+pred_sp_all$Species %>% unique %>% length
+
+pred_sp_all <- pred_sp_all[pred_sp_all$Type_of_cost_merged == "Damage",]
+
+dim(pred_sp_all)
+pred_sp_all$Species %>% unique %>% length
+
+pred_sp_all <- pred_sp_all[!is.na(pred_sp_all$Impacted_sector),]
+
+dim(pred_sp_all)
+pred_sp_all$Species %>% unique %>% length
+
+pred_sp_all <- unique(pred_sp_all)
+
+dim(pred_sp_all)
+pred_sp_all$Species %>% unique %>% length
+
+saveRDS(pred_sp_all, "pred_sp_all2.rds")
+```

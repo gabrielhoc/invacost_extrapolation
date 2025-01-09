@@ -1,0 +1,250 @@
+"global_code","global_name","region_code","region_name","subregion_code","subregion_name","intermediateregion_code","intermediateregion_name","country_or_area","m49_code","iso_alpha3_code","ldc","lldc","sids","developed","developing"
+1,"World",2,"Africa",15,"Northern Africa",NA,NA,"Algeria",12,"DZA",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",15,"Northern Africa",NA,NA,"Egypt",818,"EGY",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",15,"Northern Africa",NA,NA,"Libya",434,"LBY",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",15,"Northern Africa",NA,NA,"Morocco",504,"MAR",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",15,"Northern Africa",NA,NA,"Sudan",729,"SDN",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",15,"Northern Africa",NA,NA,"Tunisia",788,"TUN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",15,"Northern Africa",NA,NA,"Western Sahara",732,"ESH",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","British Indian Ocean Territory",86,"IOT",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Burundi",108,"BDI",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Comoros",174,"COM",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Djibouti",262,"DJI",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Eritrea",232,"ERI",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Ethiopia",231,"ETH",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","French Southern Territories",260,"ATF",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Kenya",404,"KEN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Madagascar",450,"MDG",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Malawi",454,"MWI",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Mauritius",480,"MUS",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Mayotte",175,"MYT",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Mozambique",508,"MOZ",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Réunion",638,"REU",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Rwanda",646,"RWA",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Seychelles",690,"SYC",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Somalia",706,"SOM",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","South Sudan",728,"SSD",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Uganda",800,"UGA",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","United Republic of Tanzania",834,"TZA",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Zambia",894,"ZMB",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",14,"Eastern Africa","Zimbabwe",716,"ZWE",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Angola",24,"AGO",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Cameroon",120,"CMR",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Central African Republic",140,"CAF",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Chad",148,"TCD",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Congo",178,"COG",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Democratic Republic of the Congo",180,"COD",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Equatorial Guinea",226,"GNQ",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Gabon",266,"GAB",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",17,"Middle Africa","Sao Tome and Principe",678,"STP",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",18,"Southern Africa","Botswana",72,"BWA",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",18,"Southern Africa","Eswatini",748,"SWZ",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",18,"Southern Africa","Lesotho",426,"LSO",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",18,"Southern Africa","Namibia",516,"NAM",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",18,"Southern Africa","South Africa",710,"ZAF",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Benin",204,"BEN",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Burkina Faso",854,"BFA",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Cabo Verde",132,"CPV",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Côte d’Ivoire",384,"CIV",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Gambia",270,"GMB",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Ghana",288,"GHA",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Guinea",324,"GIN",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Guinea-Bissau",624,"GNB",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Liberia",430,"LBR",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Mali",466,"MLI",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Mauritania",478,"MRT",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Niger",562,"NER",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Nigeria",566,"NGA",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Saint Helena",654,"SHN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Senegal",686,"SEN",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Sierra Leone",694,"SLE",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",2,"Africa",202,"Sub-Saharan Africa",11,"Western Africa","Togo",768,"TGO",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Anguilla",660,"AIA",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Antigua and Barbuda",28,"ATG",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Aruba",533,"ABW",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Bahamas",44,"BHS",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Barbados",52,"BRB",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Bonaire, Sint Eustatius and Saba",535,"BES",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","British Virgin Islands",92,"VGB",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Cayman Islands",136,"CYM",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Cuba",192,"CUB",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Curaçao",531,"CUW",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Dominica",212,"DMA",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Dominican Republic",214,"DOM",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Grenada",308,"GRD",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Guadeloupe",312,"GLP",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Haiti",332,"HTI",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Jamaica",388,"JAM",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Martinique",474,"MTQ",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Montserrat",500,"MSR",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Puerto Rico",630,"PRI",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Saint Barthélemy",652,"BLM",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Saint Kitts and Nevis",659,"KNA",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Saint Lucia",662,"LCA",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Saint Martin (French Part)",663,"MAF",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Saint Vincent and the Grenadines",670,"VCT",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Sint Maarten (Dutch part)",534,"SXM",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Trinidad and Tobago",780,"TTO",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","Turks and Caicos Islands",796,"TCA",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",29,"Caribbean","United States Virgin Islands",850,"VIR",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",13,"Central America","Belize",84,"BLZ",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",13,"Central America","Costa Rica",188,"CRI",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",13,"Central America","El Salvador",222,"SLV",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",13,"Central America","Guatemala",320,"GTM",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",13,"Central America","Honduras",340,"HND",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",13,"Central America","Mexico",484,"MEX",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",13,"Central America","Nicaragua",558,"NIC",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",13,"Central America","Panama",591,"PAN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Argentina",32,"ARG",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Bolivia (Plurinational State of)",68,"BOL",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Bouvet Island",74,"BVT",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Brazil",76,"BRA",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Chile",152,"CHL",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Colombia",170,"COL",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Ecuador",218,"ECU",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Falkland Islands (Malvinas)",238,"FLK",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","French Guiana",254,"GUF",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Guyana",328,"GUY",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Paraguay",600,"PRY",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Peru",604,"PER",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","South Georgia and the South Sandwich Islands",239,"SGS",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Suriname",740,"SUR",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Uruguay",858,"URY",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",419,"Latin America and the Caribbean",5,"South America","Venezuela (Bolivarian Republic of)",862,"VEN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",19,"Americas",21,"Northern America",NA,NA,"Bermuda",60,"BMU",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",19,"Americas",21,"Northern America",NA,NA,"Canada",124,"CAN",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",19,"Americas",21,"Northern America",NA,NA,"Greenland",304,"GRL",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",19,"Americas",21,"Northern America",NA,NA,"Saint Pierre and Miquelon",666,"SPM",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",19,"Americas",21,"Northern America",NA,NA,"United States of America",840,"USA",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",NA,NA,NA,NA,NA,NA,"Antarctica",10,"ATA",FALSE,FALSE,FALSE,FALSE,FALSE
+1,"World",142,"Asia",143,"Central Asia",NA,NA,"Kazakhstan",398,"KAZ",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",143,"Central Asia",NA,NA,"Kyrgyzstan",417,"KGZ",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",143,"Central Asia",NA,NA,"Tajikistan",762,"TJK",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",143,"Central Asia",NA,NA,"Turkmenistan",795,"TKM",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",143,"Central Asia",NA,NA,"Uzbekistan",860,"UZB",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",30,"Eastern Asia",NA,NA,"China",156,"CHN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",30,"Eastern Asia",NA,NA,"China, Hong Kong Special Administrative Region",344,"HKG",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",30,"Eastern Asia",NA,NA,"China, Macao Special Administrative Region",446,"MAC",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",30,"Eastern Asia",NA,NA,"Democratic People's Republic of Korea",408,"PRK",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",30,"Eastern Asia",NA,NA,"Japan",392,"JPN",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",142,"Asia",30,"Eastern Asia",NA,NA,"Mongolia",496,"MNG",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",30,"Eastern Asia",NA,NA,"Republic of Korea",410,"KOR",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Brunei Darussalam",96,"BRN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Cambodia",116,"KHM",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Indonesia",360,"IDN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Lao People's Democratic Republic",418,"LAO",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Malaysia",458,"MYS",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Myanmar",104,"MMR",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Philippines",608,"PHL",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Singapore",702,"SGP",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Thailand",764,"THA",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Timor-Leste",626,"TLS",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",142,"Asia",35,"South-eastern Asia",NA,NA,"Viet Nam",704,"VNM",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"Afghanistan",4,"AFG",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"Bangladesh",50,"BGD",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"Bhutan",64,"BTN",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"India",356,"IND",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"Iran (Islamic Republic of)",364,"IRN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"Maldives",462,"MDV",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"Nepal",524,"NPL",TRUE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"Pakistan",586,"PAK",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",34,"Southern Asia",NA,NA,"Sri Lanka",144,"LKA",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Armenia",51,"ARM",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Azerbaijan",31,"AZE",FALSE,TRUE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Bahrain",48,"BHR",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Cyprus",196,"CYP",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Georgia",268,"GEO",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Iraq",368,"IRQ",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Israel",376,"ISR",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Jordan",400,"JOR",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Kuwait",414,"KWT",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Lebanon",422,"LBN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Oman",512,"OMN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Qatar",634,"QAT",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Saudi Arabia",682,"SAU",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"State of Palestine",275,"PSE",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Syrian Arab Republic",760,"SYR",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Turkey",792,"TUR",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"United Arab Emirates",784,"ARE",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",142,"Asia",145,"Western Asia",NA,NA,"Yemen",887,"YEM",TRUE,FALSE,FALSE,FALSE,TRUE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Belarus",112,"BLR",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Bulgaria",100,"BGR",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Czechia",203,"CZE",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Hungary",348,"HUN",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Poland",616,"POL",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Republic of Moldova",498,"MDA",FALSE,TRUE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Romania",642,"ROU",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Russian Federation",643,"RUS",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Slovakia",703,"SVK",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",151,"Eastern Europe",NA,NA,"Ukraine",804,"UKR",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Åland Islands",248,"ALA",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",830,"Channel Islands","Guernsey",831,"GGY",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",830,"Channel Islands","Jersey",832,"JEY",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",830,"Channel Islands","Sark",680,NA,FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Denmark",208,"DNK",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Estonia",233,"EST",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Faroe Islands",234,"FRO",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Finland",246,"FIN",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Iceland",352,"ISL",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Ireland",372,"IRL",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Isle of Man",833,"IMN",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Latvia",428,"LVA",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Lithuania",440,"LTU",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Norway",578,"NOR",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Svalbard and Jan Mayen Islands",744,"SJM",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"Sweden",752,"SWE",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",154,"Northern Europe",NA,NA,"United Kingdom of Great Britain and Northern Ireland",826,"GBR",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Albania",8,"ALB",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Andorra",20,"AND",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Bosnia and Herzegovina",70,"BIH",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Croatia",191,"HRV",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Gibraltar",292,"GIB",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Greece",300,"GRC",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Holy See",336,"VAT",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Italy",380,"ITA",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Malta",470,"MLT",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Montenegro",499,"MNE",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"North Macedonia",807,"MKD",FALSE,TRUE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Portugal",620,"PRT",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"San Marino",674,"SMR",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Serbia",688,"SRB",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Slovenia",705,"SVN",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",39,"Southern Europe",NA,NA,"Spain",724,"ESP",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"Austria",40,"AUT",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"Belgium",56,"BEL",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"France",250,"FRA",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"Germany",276,"DEU",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"Liechtenstein",438,"LIE",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"Luxembourg",442,"LUX",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"Monaco",492,"MCO",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"Netherlands",528,"NLD",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",150,"Europe",155,"Western Europe",NA,NA,"Switzerland",756,"CHE",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",9,"Oceania",53,"Australia and New Zealand",NA,NA,"Australia",36,"AUS",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",9,"Oceania",53,"Australia and New Zealand",NA,NA,"Christmas Island",162,"CXR",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",9,"Oceania",53,"Australia and New Zealand",NA,NA,"Cocos (Keeling) Islands",166,"CCK",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",9,"Oceania",53,"Australia and New Zealand",NA,NA,"Heard Island and McDonald Islands",334,"HMD",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",9,"Oceania",53,"Australia and New Zealand",NA,NA,"New Zealand",554,"NZL",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",9,"Oceania",53,"Australia and New Zealand",NA,NA,"Norfolk Island",574,"NFK",FALSE,FALSE,FALSE,TRUE,FALSE
+1,"World",9,"Oceania",54,"Melanesia",NA,NA,"Fiji",242,"FJI",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",54,"Melanesia",NA,NA,"New Caledonia",540,"NCL",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",54,"Melanesia",NA,NA,"Papua New Guinea",598,"PNG",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",54,"Melanesia",NA,NA,"Solomon Islands",90,"SLB",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",54,"Melanesia",NA,NA,"Vanuatu",548,"VUT",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",57,"Micronesia",NA,NA,"Guam",316,"GUM",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",57,"Micronesia",NA,NA,"Kiribati",296,"KIR",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",57,"Micronesia",NA,NA,"Marshall Islands",584,"MHL",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",57,"Micronesia",NA,NA,"Micronesia (Federated States of)",583,"FSM",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",57,"Micronesia",NA,NA,"Nauru",520,"NRU",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",57,"Micronesia",NA,NA,"Northern Mariana Islands",580,"MNP",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",57,"Micronesia",NA,NA,"Palau",585,"PLW",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",57,"Micronesia",NA,NA,"United States Minor Outlying Islands",581,"UMI",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"American Samoa",16,"ASM",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"Cook Islands",184,"COK",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"French Polynesia",258,"PYF",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"Niue",570,"NIU",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"Pitcairn",612,"PCN",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"Samoa",882,"WSM",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"Tokelau",772,"TKL",FALSE,FALSE,FALSE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"Tonga",776,"TON",FALSE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"Tuvalu",798,"TUV",TRUE,FALSE,TRUE,FALSE,TRUE
+1,"World",9,"Oceania",61,"Polynesia",NA,NA,"Wallis and Futuna Islands",876,"WLF",FALSE,FALSE,FALSE,FALSE,TRUE
